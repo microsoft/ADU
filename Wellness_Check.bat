@@ -1,0 +1,1 @@
+Powershell "c:\adu\adu.ps1 -wellness_check"

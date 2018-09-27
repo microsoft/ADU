@@ -1,0 +1,1 @@
+PowerShell.exe C:\ADU\ADU.ps1 -diagnostics_Collection -actions default_bundle

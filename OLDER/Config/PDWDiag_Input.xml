@@ -1,0 +1,527 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+New Action Template:
+    <action name="output_filename_no_spaces" type="action_type" title="Menu item" value="command or query to be run" />
+
+	Available Action Types:
+		"query_pdw" - used when you want to execute a query against pdw
+			Specify: name, type, title, value
+		"query_CTL" - used when you want to execute a query against the control node SQL Database
+			Specify: name, type, title, value
+		"query_CMP" - used when you want to execute a query against each of the compute node sql databases
+			Specify: name, type, title, value
+		"pshell" - used when you want to execute a PowerShell command against the head node
+			Specify: name, type, title, value
+		"dist_pshell" - used when you want to run a PowerShell command across multiple nodes on appliance
+			Specify: name, type, title, value, nodelist{CTL,CMP,MAD,AD,VMM,HST,HSA,ISCSI,Local}
+		"File_Collector" - collects files. Specify the path not including the drive letter in the value field. Wildcards accepted. ex: value="MSSQL10.SQL*\MSSQL\LOG\ERR*"
+			Specify: name, type, title, days, value
+		"bundle" - used to run all of the actions within that option
+			Specify: Name, type, title
+		"custom_bundle" - pick and choose actions to put in your bundle and they will all be put into a new folder
+			Specify: Name, type, title, value
+		
+		**BUNDLE MUST BE SPECIFIED LAST WITHIN AN Action LIST AND CUSTOM BUNDLE MUST BE THE LAST OPTION IN THE Option LIST
+		
+		***Double quotes or xml-reserved characters should not be used within any parameters. Use single quotes where possible. In extreme cases, you may be able to put the entire
+		option in single quotes and use double quotes within the value. ***
+-->
+<menu> 
+   <option name="Informational">
+      <action name="Pdw_Version" type="query_pdw" title="PDW Version" value="SELECT @@VERSION" />
+	  <action name="dm_pdw_nodes" type="query_pdw" title="dm_pdw_nodes" value="select * from sys.dm_pdw_nodes" />
+	  <action name="dm_pdw_network_credentials" type="query_pdw" title="dm_pdw_network_credentials" value="select * from sys.dm_pdw_network_credentials" />
+	  <action name="sysusers" type="query_pdw" title="sysusers" value="select * from sys.sysusers" />
+      <action name="Database_List" type="query_pdw" title="Database List" value="SELECT * FROM sys.databases" />
+	  <action name="Database_GUID_Mappings" type="query_pdw" title="Database GUID Mappings" value="select a.database_id, a.name, b.physical_name from sys.databases as a, sys.pdw_database_mappings as b where a.database_id = b.database_id" />
+	  <action name="Database_Table_GUID_Mappings" type="query_pdw" title="Database and Table GUID Mapping" value="declare @db varchar(100); declare @sql varchar(500); set @db = (select top 1 name from sys.databases where name not in ('master','tempdb')); set @sql = 'select a.database_id as DB_ID, a.name as DB_Name, b.physical_name as DB_GUID, c.name as Table_Name, d.physical_name as Table_GUID from ' + @db + '.sys.databases as a, ' + @db + '.sys.pdw_database_mappings as b, '+ @db + '.sys.tables as c, ' + @db + '.sys.pdw_table_mappings as d where a.database_id = b.database_id and c.object_id = d.object_id;'; exec (@sql);" />
+      <action name="Appliance_topology" type="pshell" title="Appliance Topology" value="[xml]$apd = Get-Content C:\PDWINST\media\AppliancePdwDefinition.xml; $apd.AppliancePdw.region.Topology" />
+      <action name="PDW_node_list" type="query_pdw" title="PDW Node List" value="SELECT * FROM sys.dm_pdw_nodes" />
+      <action name="Users_with_Explicit_Permissions" type="query_pdw" title="Users with Granted Explicit Permissions" value="SELECT name, 'has the ', state_desc , permission_name, ' permission' FROM sys.server_permissions AS SP JOIN sys.server_principals AS SPRoles ON SP.grantee_principal_id = SPRoles.principal_id;" />
+	  <action name="SystemInfo" type="dist_pshell" Nodes="HST,HSA,CTL,CMP,AD,VMM,MAD,ISCSI" title="System Info - All Nodes" value="systeminfo" />
+	  <action name="Last_Boot_Time" type="dist_pshell" Nodes="HST,HSA,CTL,CMP,AD,VMM,MAD,ISCSI" title="Last Boot Time - All Nodes" value="$wmi = gwmi -Class win32_operatingSystem;$wmi.ConvertToDateTime($wmi.LastBootUpTIme)"/>	   
+	  <action name="Physical_Memory_inGB" type="dist_pshell" Nodes="HST,HSA,CTL,CMP,AD,VMM,MAD,ISCSI" title="Physical Memory - All Nodes" value="Get-WmiObject win32_physicalmemory |select DeviceLocator, @{Expression={($_.capacity/1gb)}}" />
+	  <action name="Installed_Software" type="dist_pshell" Nodes="HST,HSA,CTL,CMP,AD,VMM,MAD,ISCSI" title="Installed Software - All Nodes" value="gwmi win32_product | format-table -Property name,version" />
+	  <action name="Server_Serial_Nums" type="dist_pshell" nodes="HSA,HST" title="Server Serial Numbers" value="(gwmi win32_systemenclosure).serialNumber" />
+	  <action name="Info_Bundle" type="bundle" title="Info Bundle" />
+   </option>
+   <option name="Firmware and Drivers">      
+    <action name="Driver_List" type="dist_pshell" nodes="HSA,HST" title="Driver List - All Nodes" value="Get-WmiObject -class Win32_pnpsigneddriver |format-table -Wrap DeviceName, DriverProviderName, DriverVersion, DriverDate" />
+    <action name="Vstat" type="dist_pshell" nodes="HSA,HST" title="Vstat - Physical nodes" value="vstat" />
+	<action name="BIOS_FW_version_date" type="dist_pshell" nodes="HSA,HST" title="BIOS FW version and date" value="(get-Wmiobject -namespace root\wmi -class MS_SystemInformation |fl BIOSVersion, BIOSReleaseDate)" />
+	<action name="HBA_driver_version" type="dist_pshell" nodes="HSA,HST" title="HBA driver version" value="dir c:\Windows\system32\drivers\lsi_sas2.sys |fl * |findstr FileVersion" />
+	<action name="BroadcomNIC_VBD_driver_version" type="dist_pshell" nodes="HSA,HST" title="BroadcomNIC VBD driver version" value="dir c:\Windows\system32\drivers\bxvbda.sys |fl * |findstr FileVersion" />
+    <action name="Mellanox_IB_driver_version" type="dist_pshell" nodes="HSA,HST" title="Mellanox IB driver version" value="dir c:\Windows\system32\drivers\ipoib6x.sys |fl * |findstr FileVersion" />
+    <action name="HP_SmartArray_FW_Version" type="dist_pshell" nodes="HSA,HST" title="HP ONLY - HP SmartArray FW Version" value="	If(gwmi win32_systemenclosure){(get-Wmiobject -namespace root\cimv2 Win32_DiskDrive |? {$_.Caption -match 'HP LOGICAL VOLUME'} |select -last 1).firmwarerevision}" /> 
+    <action name="HP_FC_HBA_FW_version" type="dist_pshell" nodes="HSA,HST" title="HP ONLY - FC HBA FW version" value="(get-Wmiobject -namespace root\wmi MSFC_FCAdapterHBAAttributes).FirmwareVersion" /> 
+	<action name="HP_iLO4_channel_driver_version" type="dist_pshell" nodes="HSA,HST" title="HP ONLY - iLO4 channel driver version" value="dir C:\Windows\system32\drivers\hpqilo3chif.sys |fl * |findstr FileVersion" />
+    <action name="HP_Chipset_driver_version" type="dist_pshell" nodes="HSA,HST" title="HP ONLY - Chipset driver version" value="dir c:\cpqsystem\pnpdrvs\combiver.dll |fl * |findstr FileVersion" /> 
+    <action name="HP_SmartArray_SAS_Controller_driver_version" type="dist_pshell" nodes="HSA,HST" title="HP ONLY - SmartArray SAD Controller driver version" value="dir c:\Windows\system32\drivers\hpcisss2.sys |fl * |findstr FileVersion" />
+    <action name="HP_Insight_Management_Agents_driver_version" type="dist_pshell" nodes="HSA,HST" title="HP ONLY - HP Insight Management Agents driver version" value="dir c:\Windows\system32\cpqmgmt\agentver.dll |fl * |findstr FileVersion" />
+    <action name="HP_IntelChipset_driver_version_G7" type="dist_pshell" nodes="HSA,HST" title="HP ONLY - IntelChipset driver version G7" value="dir c:\cpqsystem\pnpdrvs\i_chpstv.dll |fl * |findstr FileVersion" />
+    <action name="HP_IntelChipset_driver_version_G8" type="dist_pshell" nodes="HSA,HST" title="HP ONLY - IntelChipset driver version G8" value="dir c:\cpqsystem\pnpdrvs\combiver.dll |fl * |findstr FileVersion" />
+    <action name="HP_iLO3_driver_version" type="dist_pshell" nodes="HSA,HST" title="HP ONLY - iLO3 driver version" value="dir C:\Windows\system32\drivers\hpqilo3core.sys |fl * |findstr FileVersion" />
+    <action name="HP_BroadcomNIC_driver_version" type="dist_pshell" nodes="HSA,HST" title="HP ONLY - BroadcomNIC driver version" value="dir c:\Windows\system32\drivers\bxnd60a.sys |fl * |findstr FileVersion" />
+    <action name="HP_Online_Diagnostics_driver_version" type="dist_pshell" nodes="HSA,HST" title="HP ONLY - Online Diagnostics driver version" value="dir c:\hp\hpdiags\hpdiags.exe |fl * |findstr FileVersion" />
+    <action name="HP_Matrox_G200eH_video_driver_version" type="dist_pshell" nodes="HSA,HST" title="HP ONLY - Matrox G200eH video driver version" value="dir C:\Windows\System32\drivers\MxG2hDO64.sys |fl * |findstr FileVersion" />
+    <action name="HP_EmulexHBA_driver_version" type="dist_pshell" nodes="HSA,HST" title="HP ONLY - EmulexHBA driver version" value="dir C:\StorageWorks\Version\ElxStorPortESVer64.exe |fl * |findstr FileVersion" />
+	<action name="HP_iLO4_management_driver_version" type="dist_pshell" nodes="HSA,HST" title="HP ONLY - iLO4 management driver version" value="dir 'C:\Program Files\Hewlett-Packard\iLO 3\service\ProLiantMonitor.exe' |fl versioninfo |findstr FileVersion" />
+	<action name="HP_NC_331FLR_FlexLOM_driver_version" type="dist_pshell" nodes="HSA,HST" title="HP ONLY - NC 331FLR FlexLOM driver version" value="(get-wmiobject Win32_PnpSignedDriver |where {$_.DeviceName -like '*331FLR*'}) |findstr DriverVersion" />
+	<action name="HP_NC_Qlogic_nx3_Multifunction_Driver_version" type="dist_pshell" nodes="HSA,HST" title="HP ONLY - HP NC Qlogic nx3 Multifunction Driver version" value="(get-wmiobject Win32_PnpSignedDriver |where {$_.Devicename -like '*NC3*' -and $_.Devicename -like '*Multifunction*'}) |findstr DriverVersion" />
+    <action name="Firmware_Drivers_Bundle" type="bundle" title="Firmware and Drivers Bundle" />
+   </option>
+   <option name="Workload">
+	  <action name="dm_pdw_nodes_exec_sessions" type="query_pdw" title="dm_pdw_nodes_exec_sessions" value="select * from sys.dm_pdw_nodes_exec_sessions" />
+	  <action name="dm_pdw_nodes_exec_requests" type="query_pdw" title="dm_pdw_nodes_exec_requests" value="select * from sys.dm_pdw_nodes_exec_requests order by start_time desc" />
+	  <action name="dm_pdw_exec_requests" type="query_pdw" title="PDW Exec Requests" value="select * from sys.dm_pdw_exec_requests order by submit_time desc" />
+	  <action name="active_sessions" type="query_pdw" title="Active Sessions" value="SELECT * FROM sys.dm_pdw_exec_sessions WHERE status IN ('Active','Idle')" />
+      <action name="active_queries" type="query_pdw" title="Active Queries" value="SELECT * FROM sys.dm_pdw_exec_requests WHERE status IN ('Pending', 'Authorizing', 'AcquireSystemResources', 'Initializing', 'Plan', 'Parsing', 'AquireResources', 'Running', 'Cancelling') ORDER BY start_time DESC" />
+      <action name="pdw_sys_info" type="query_pdw" title="PDW SYS Info Appliance-Level" value="select * from sys.dm_pdw_sys_info" />
+      <action name="dm_pdw_waits" type="query_pdw" title="PDW Waits" value="select * from sys.dm_pdw_waits" />
+      <action name="pdw_request_steps" type="query_pdw" title="PDW Request Steps" value="select * from sys.dm_pdw_request_steps " />
+	  <action name="pdw_sql_requests" type="query_pdw" title="pdw_sql_requests" value="select * from sys.dm_pdw_sql_requests order by start_time desc" /> 
+      <action name="dm_pdw_node_status" type="query_pdw" title="dm_pdw_node_status" value="select * from sys.dm_pdw_node_status order by sent_time desc" />
+	  <action name="pdw_loader_backup_runs" type="query_pdw" title="PDW Loader Backup Runs" value="select * from sys.pdw_loader_backup_runs where start_time >= DATEADD(day, -7, SYSDATETIME()) order by submit_time desc" />
+	  <action name="pdw_loader_run_stages" type="query_pdw" title="PDW Loader Run Stages" value="select * from sys.pdw_loader_run_stages where start_time > DATEADD(day, -7, SYSDATETIME())" />
+	  <action name="pdw_loader_backup_run_details" type="query_pdw" title="pdw_loader_backup_run_details" value="select * from sys.pdw_loader_backup_run_details" />
+	  <action name="pdw_monitor_loads" type="query_pdw" title="Monitor Loads" value="SELECT lbr.run_id, er.submit_time, er.end_time, er.total_elapsed_time, er.error_id, lbr.rows_processed, lbr.rows_rejected, lbr.rows_inserted FROM sys.dm_pdw_exec_requests er LEFT OUTER JOIN sys.pdw_loader_backup_runs lbr ON (er.request_id=lbr.request_id) WHERE er.request_id=lbr.request_id;" />	  
+	  <action name="dm_pdw_dms_workers" type="query_pdw" title="DMS workers" value="select * from sys.dm_pdw_dms_workers order by start_time desc" />
+	  <action name="dm_pdw_wait_stats" type="query_pdw" title="dm_pdw_wait_stats" value="select * from sys.dm_pdw_wait_stats" />
+      <action name="dm_pdw_sql_requests" type="query_pdw" title="dm_pdw_sql_requests" value="select * from sys.dm_pdw_sql_requests" />
+      <action name="tempdb_sys_tables" type="query_pdw" title="Temp Tables" value="select * from tempdb.sys.tables" />
+      <action name="sp_pdw_showundooperations" type="query_pdw" title="Rollback Operations" value="EXEC sp_pdw_showundooperations" />
+	  <action name="memory_details_per_request_id" type="query_pdw" title="Memory details per request id" value="SELECT 
+pr.session_id, pr.request_id, 
+psqlr.status AS sql_request_status,
+psqlr.start_time AS sql_start_time, psqlr.end_time AS sql_end_time,
+psqlr.total_elapsed_time, psqlr.row_count, psqlr.spid, psqlr.command AS sql_command,
+pr.resource_class, psqlr.step_index AS sql_request_step, psqlr.pdw_node_id,
+psqlr.distribution_id, psqlr.row_count AS sql_row_counts, sqlr.blocking_session_id,
+sqlr.wait_type, sqlr.wait_time, sqlr.last_wait_type, sqlr.wait_resource,
+sqlr.percent_complete, sqlr.estimated_completion_time, sqlr.cpu_time,
+sqlr.scheduler_id, sqlr.reads, sqlr.writes, sqlr.logical_reads,
+[mem].granted_memory_kb, 
+[mem].requested_memory_kb, [mem].ideal_memory_kb, 
+( [mem].ideal_memory_kb - [mem].granted_memory_kb )/( 1024 * 1024 ) 
+    AS requested_memory_gap,
+[mem].query_cost, [mem].dop, [mem].pool_id
+FROM sys.dm_pdw_exec_requests AS pr
+JOIN sys.dm_pdw_sql_requests AS psqlr 
+    ON psqlr.request_id = pr.request_id
+JOIN sys.dm_pdw_nodes_exec_requests AS sqlr 
+    ON sqlr.[session_id] = psqlr.[spid]
+        AND sqlr.[pdw_node_id] = psqlr.[pdw_node_id]
+JOIN sys.dm_pdw_nodes_exec_query_memory_grants AS [mem] 
+    ON [mem].[session_id] = psqlr.[spid] 
+        AND [mem].[pdw_node_id] = psqlr.[pdw_node_id];" />
+		<action name="memory_grants_requests" type="query_pdw" title="Retrieves memory grant information for all of my requests in the current session" value="SELECT 
+     n.name,per.command,ser.session_id,per.request_id,ser.start_time,per.step_index,per.operation_type,per.distribution_type,per.location_type,per.status,
+     per.start_time,per.end_time,per.total_elapsed_time,per.row_count,ser.blocking_session_id,
+     ser.wait_type,ser.wait_time,ser.last_wait_type,ser.wait_resource,ser.open_transaction_count,ser.cpu_time,ser.total_elapsed_time,
+     ser.reads,ser.writes,ser.logical_reads,ser.granted_query_memory,ser.plan_handle,ser.group_id
+FROM 
+sys.dm_pdw_request_steps per 
+LEFT JOIN sys.dm_pdw_sql_requests AS psqlr 
+    ON psqlr.request_id = per.request_id
+INNER JOIN sys.dm_pdw_nodes n on psqlr.pdw_node_id = n.pdw_node_id
+JOIN sys.dm_pdw_nodes_exec_requests AS SER 
+    ON SER.[session_id] = psqlr.[spid]
+    AND SER.[pdw_node_id] = psqlr.[pdw_node_id]
+WHERE PER.STATUS NOT IN ('COMPLETE')
+order by wait_time desc;" />	
+<action name="optimizations_suboptimal_plans" type="query_pdw" title="Retrieves highest number of query optimizations or suboptimal plan generations" value="SELECT 
+p.pool_id, p.name, g.group_id, g.name,
+g.total_query_optimization_count, g.total_suboptimal_plan_generation_count
+FROM sys.dm_pdw_nodes_resource_governor_workload_groups AS g
+INNER JOIN sys.dm_pdw_nodes_resource_governor_resource_pools AS p 
+    ON g.pool_id = p.pool_id
+ORDER BY g.total_suboptimal_plan_generation_count DESC;" />	
+<action name="avg_cpu_time_per_request" type="query_pdw" title="Retrieves Average CPU time per request in each resource pool to date" value="SELECT 
+p.pool_id, p.name, 
+COALESCE ( SUM (t.total_request_count), 0 ) AS total_request_count,
+COALESCE (SUM ( t.total_cpu_usage_ms), 0 ) AS total_cpu_usage_ms,
+CASE WHEN SUM (t.total_request_count ) > 0 
+     THEN SUM ( t.total_cpu_usage_ms) / SUM (t.total_request_count ) 
+     ELSE 0 
+END
+FROM sys.dm_pdw_nodes_resource_governor_resource_pools AS p
+LEFT OUTER JOIN
+(
+    SELECT g.pool_id, g.total_request_count, g.total_cpu_usage_ms
+    FROM sys.dm_pdw_nodes_resource_governor_workload_groups AS g
+    WHERE g.pool_id > 1
+) AS t
+ON p.pool_id = t.pool_id
+GROUP BY p.pool_id, p.name;" />	
+	  <action name="Workload_Bundle" type="bundle" title="Workload Bundle" />
+   </option>
+   <option name="Health">
+      <action name="active_alerts" type="query_pdw" title="Active Alerts" value="select haa.alert_instance_id, pn.name, hcg.group_name + '/'+hc.component_name +': '+ha.state as component, haa.current_value, hcp.physical_name + ': ' + isnull(chs.property_value,'') as property, create_time, ha.severity as severity_description, ha.description, ( CASE ha.severity WHEN 'Error' then 2 WHEN 'Warning' then 1  ELSE 0  END )  AS severity from  sys.dm_pdw_component_health_active_alerts haa inner join sys.dm_pdw_nodes pn            on haa.pdw_node_id = pn.pdw_node_id         inner join sys.pdw_health_alerts ha           on haa.alert_id = ha.alert_id          inner join sys.pdw_health_components hc           on haa.component_id = hc.component_id         inner join sys.pdw_health_component_groups hcg          on hc.group_id = hcg.group_id          inner join sys.dm_pdw_component_health_status chs         on haa.pdw_node_id = chs.pdw_node_id            and haa.component_id = chs.component_id          and haa.component_instance_id = chs.component_instance_id     inner join sys.pdw_health_component_properties hcp          on chs.property_id = hcp.property_id      order by name, alert_instance_id, property " />
+      <action name="dm_pdw_dms_cores" type="query_pdw" title="dm_pdw_dms_cores" value="select * from sys.dm_pdw_dms_cores" />
+	  <action name="pdw_errors" type="query_pdw" title="PDW Errors" value="select * from sys.dm_pdw_errors order by create_time desc" />
+	  <action name="pdw_health_alerts" type="query_pdw" title="pdw_health_alerts" value="select * from sys.pdw_health_alerts" />
+	  <action name="dm_pdw_component_health_alerts" type="query_pdw" title="dm_pdw_component_health_alerts" value="select * from sys.dm_pdw_component_health_alerts" />
+	  <action name="dm_pdw_component_health_active_alerts" type="query_pdw" title="dm_pdw_component_health_active_alerts" value="select * from sys.dm_pdw_component_health_active_alerts" />
+	  <action name="dm_pdw_component_health_status" type="query_pdw" title="Retrieves the status for all components" value="SELECT 
+   s.[pdw_node_id],
+   n.[name] as [node_name],
+   n.[address] ,
+   g.[group_id] ,
+   g.[group_name] ,
+   c.[component_id] ,
+   c.[component_name] ,
+   s.[component_instance_id] , 
+   p.[property_name] ,
+   s.[property_value] ,
+   s.[update_time]
+FROM [sys].[dm_pdw_component_health_status] AS s
+JOIN sys.dm_pdw_nodes AS n 
+   ON s.[pdw_node_id] = n.[pdw_node_id]
+JOIN [sys].[pdw_health_components] AS c 
+   ON s.[component_id] = c.[component_id]
+JOIN [sys].[pdw_health_component_groups] AS g 
+   ON c.[group_id] = g.[group_id]
+JOIN [sys].[pdw_health_component_properties] AS p 
+   ON s.[property_id] = p.[property_id] AND s.[component_id] = p.[component_id]
+WHERE p.property_name = 'Status'
+ORDER BY
+   s.[pdw_node_id],
+   g.[group_name] , 
+   s.[component_instance_id] ,
+   c.[component_name] , 
+   p.[property_name];" />
+	  <action name="dm_pdw_errors" type="query_pdw" title="dm_pdw_errors" value="select * from sys.dm_pdw_errors" />
+  	  <action name="Failovers" type="query_pdw" title="Failovers" value="SELECT SUBSTRING( component_instance_id, 2, charindex(' ', component_instance_id, 1)-2) AS failed_node_name, create_time AS failover_time FROM sys.dm_pdw_component_health_active_alerts WHERE alert_id = 500139 ORDER BY failed_node_name;" />
+	  <action name="Cluster_state" type="dist_pshell" nodes="HSA,HST,CTL,CMP" title="Cluster state" value="get-cluster| ft ;get-clusternode | ft NodeName,State,ID; get-clustergroup | ft;Get-ClusterResource | ft Name,State,OwnerGroup,OwnerNode,ResourceType;Get-ClusterSharedVolume | ft ;Get-ClusterNetwork | ft Name,State,Address,AddressMask" />
+	  <action name="Storage_state" type="dist_pshell" nodes="HSA,HST" title="Storage state" value="Get-PhysicalDisk | ft FriendlyName,OperationalStatus,HealthStatus,usage,CanPool,EnclosureNumber,SlotNumber,Size,UniqueId; Get-VirtualDisk | ft ; Get-ClusterSharedVolume | ft" />
+	  <action name="Bugchecks" type="dist_pshell" Nodes="HST,HSA,CTL,CMP,AD,VMM,MAD,ISCSI" title="Bugchecks - All Nodes" value="Get-Eventlog -logname system |Where-Object {$_.Source -eq 'BugCheck'} |Format-Table -AutoSize -Wrap TimeWritten,EntryType,Source,EventID,Message" />
+	  <action name="Unexpected_Shutdown" type="dist_pshell" Nodes="HST,HSA,CTL,CMP,AD,VMM,MAD,ISCSI" title="Unexpected Shutdowns" value="Get-Eventlog -logname system |Where-Object {$_.EventID -eq '6008'} |Format-Table -AutoSize -Wrap TimeWritten,EntryType,Source,EventID,Message" />
+      <action name="Resource_Failovers" type="dist_pshell" Nodes="HST,HSA,CTL,CMP,AD,VMM,MAD,ISCSI" title="Resource Failovers" value="$errorActionPreference='silentlyContinue';get-winevent -path 'C:\Windows\System32\winevt\Logs\Microsoft-Windows-FailoverClustering%4Operational.evtx' | ? {$_.id -eq 1153} | format-table -autosize -wrap TimeCreated,ID,Message" />
+	  <action name="Health_Bundle" type="bundle" title="Health Bundle" />	  
+   </option>
+<option name="Other PDW DMVs">
+    <action name="dm_pdw_sys_info" type="query_pdw" title="dm_pdw_sys_info" value="select * from sys.dm_pdw_sys_info" />
+    <action name="dm_pdw_resource_waits" type="query_pdw" title="dm_pdw_resource_waits" value="select * from sys.dm_pdw_resource_waits" />
+    <action name="dm_pdw_request_steps" type="query_pdw" title="dm_pdw_request_steps" value="select * from sys.dm_pdw_request_steps" />
+    <action name="dm_pdw_nodes_os_workers" type="query_pdw" title="dm_pdw_nodes_os_workers" value="select * from sys.dm_pdw_nodes_os_workers" />
+    <action name="dm_pdw_nodes_os_waiting_tasks" type="query_pdw" title="dm_pdw_nodes_os_waiting_tasks" value="select * from sys.dm_pdw_nodes_os_waiting_tasks" />
+    <action name="dm_pdw_nodes_os_wait_stats" type="query_pdw" title="dm_pdw_nodes_os_wait_stats" value="select * from sys.dm_pdw_nodes_os_wait_stats" />
+    <action name="dm_pdw_nodes_os_threads" type="query_pdw" title="dm_pdw_nodes_os_threads" value="select * from sys.dm_pdw_nodes_os_threads" />
+    <action name="dm_pdw_nodes_os_tasks" type="query_pdw" title="dm_pdw_nodes_os_tasks" value="select * from sys.dm_pdw_nodes_os_tasks" />
+    <action name="dm_pdw_nodes_os_sys_memory" type="query_pdw" title="dm_pdw_nodes_os_sys_memory" value="select * from sys.dm_pdw_nodes_os_sys_memory" />
+    <action name="dm_pdw_nodes_os_sys_info" type="query_pdw" title="dm_pdw_nodes_os_sys_info" value="select * from sys.dm_pdw_nodes_os_sys_info" />
+    <action name="dm_pdw_nodes_os_spinlock_stats" type="query_pdw" title="dm_pdw_nodes_os_spinlock_stats" value="select * from sys.dm_pdw_nodes_os_spinlock_stats" />
+    <action name="dm_pdw_nodes_os_schedulers" type="query_pdw" title="dm_pdw_nodes_os_schedulers" value="select * from sys.dm_pdw_nodes_os_schedulers" />
+    <action name="dm_pdw_nodes_os_process_memory" type="query_pdw" title="dm_pdw_nodes_os_process_memory" value="select * from sys.dm_pdw_nodes_os_process_memory" />
+    <action name="dm_pdw_nodes_os_performance_counters" type="query_pdw" title="dm_pdw_nodes_os_performance_counters" value="select * from sys.dm_pdw_nodes_os_performance_counters" />
+    <action name="dm_pdw_nodes_os_nodes" type="query_pdw" title="dm_pdw_nodes_os_nodes" value="select * from sys.dm_pdw_nodes_os_nodes" />
+    <action name="dm_pdw_nodes_os_memory_pools" type="query_pdw" title="dm_pdw_nodes_os_memory_pools" value="select * from sys.dm_pdw_nodes_os_memory_pools" />
+    <action name="dm_pdw_nodes_os_memory_objects" type="query_pdw" title="dm_pdw_nodes_os_memory_objects" value="select top 1000 * from sys.dm_pdw_nodes_os_memory_objects" />
+    <action name="dm_pdw_nodes_os_memory_nodes" type="query_pdw" title="dm_pdw_nodes_os_memory_nodes" value="select * from sys.dm_pdw_nodes_os_memory_nodes" />
+    <action name="dm_pdw_nodes_os_memory_clerks" type="query_pdw" title="dm_pdw_nodes_os_memory_clerks" value="select * from sys.dm_pdw_nodes_os_memory_clerks" />
+    <action name="dm_pdw_nodes_os_memory_cache_counters" type="query_pdw" title="dm_pdw_nodes_os_memory_cache_counters" value="select * from sys.dm_pdw_nodes_os_memory_cache_counters" />
+    <action name="dm_pdw_nodes_os_memory_brokers" type="query_pdw" title="dm_pdw_nodes_os_memory_brokers" value="select * from sys.dm_pdw_nodes_os_memory_brokers" />
+    <action name="dm_pdw_nodes_os_latch_stats" type="query_pdw" title="dm_pdw_nodes_os_latch_stats" value="select * from sys.dm_pdw_nodes_os_latch_stats" />
+    <action name="dm_pdw_nodes_os_dispatchers" type="query_pdw" title="dm_pdw_nodes_os_dispatchers" value="select * from sys.dm_pdw_nodes_os_dispatchers" />
+    <action name="dm_pdw_nodes_os_dispatcher_pools" type="query_pdw" title="dm_pdw_nodes_os_dispatcher_pools" value="select * from sys.dm_pdw_nodes_os_dispatcher_pools" />
+    <action name="dm_pdw_nodes_os_cluster_nodes" type="query_pdw" title="dm_pdw_nodes_os_cluster_nodes" value="select * from sys.dm_pdw_nodes_os_cluster_nodes" />
+	<action name="dm_pdw_nodes_io_pending_io_requests" type="query_pdw" title="dm_pdw_nodes_io_pending_io_requests" value="select * from sys.dm_pdw_nodes_io_pending_io_requests" />
+    <action name="dm_pdw_nodes_io_cluster_shared_drives" type="query_pdw" title="dm_pdw_nodes_io_cluster_shared_drives" value="select * from sys.dm_pdw_nodes_io_cluster_shared_drives" />
+    <action name="dm_pdw_nodes_exec_query_stats" type="query_pdw" title="dm_pdw_nodes_exec_query_stats" value="select top 1000 * from sys.dm_pdw_nodes_exec_query_stats" />
+    <action name="dm_pdw_nodes_exec_query_resource_semaphores" type="query_pdw" title="dm_pdw_nodes_exec_query_resource_semaphores" value="select * from sys.dm_pdw_nodes_exec_query_resource_semaphores" />
+    <action name="dm_pdw_nodes_exec_query_optimizer_info" type="query_pdw" title="dm_pdw_nodes_exec_query_optimizer_info" value="select * from sys.dm_pdw_nodes_exec_query_optimizer_info" />
+    <action name="dm_pdw_nodes_exec_query_memory_grants" type="query_pdw" title="dm_pdw_nodes_exec_query_memory_grants" value="select * from sys.dm_pdw_nodes_exec_query_memory_grants" />
+    <action name="dm_pdw_nodes_exec_procedure_stats" type="query_pdw" title="dm_pdw_nodes_exec_procedure_stats" value="select * from sys.dm_pdw_nodes_exec_procedure_stats" />
+    <action name="dm_pdw_nodes_exec_cached_plans" type="query_pdw" title="dm_pdw_nodes_exec_cached_plans" value="select top 1000 * from sys.dm_pdw_nodes_exec_cached_plans" />
+    <action name="dm_pdw_nodes_exec_background_job_queue_stats" type="query_pdw" title="dm_pdw_nodes_exec_background_job_queue_stats" value="select * from sys.dm_pdw_nodes_exec_background_job_queue_stats" />
+    <action name="dm_pdw_nodes_exec_background_job_queue" type="query_pdw" title="dm_pdw_nodes_exec_background_job_queue" value="select * from sys.dm_pdw_nodes_exec_background_job_queue" />
+    <action name="dm_pdw_nodes_db_index_usage_stats" type="query_pdw" title="dm_pdw_nodes_db_index_usage_stats" value="select * from sys.dm_pdw_nodes_db_index_usage_stats" />
+    <action name="dm_pdw_lock_waits" type="query_pdw" title="dm_pdw_lock_waits" value="select * from sys.dm_pdw_lock_waits" />
+    <action name="dm_pdw_diag_processing_stats" type="query_pdw" title="dm_pdw_diag_processing_stats" value="select * from sys.dm_pdw_diag_processing_stats" />
+    
+    <action name="DMV_Bundle" type="bundle" title="DMV Bundle" />
+   </option>
+   <option name="PDW Logs">
+	<action name="SQL_logs" type="File_Collector" title="Collect SQL Server Logs" days="10" value="MSSQL11.MSSQL*\MSSQL\LOG\ERR*" />
+	<action name="DMS_Movement_logs" type="File_Collector" title="Collect DMS Movement Logs" days="10" value="ProgramData\Microsoft\Microsoft Sql Server Parallel Data Warehouse\100\Logs\*DMS_movement*" />
+	<action name="Engine_Server_logs" type="File_Collector" title="Collect PDW Engine Server Logs" days="10" value="ProgramData\Microsoft\Microsoft Sql Server Parallel Data Warehouse\100\Logs\*DWEngine_Server*" />
+	<action name="OS_event_logs_DMV" type="query_pdw" title="Collect OS Events Logs from DMV" value="select * from sys.dm_pdw_os_event_logs order by generate_time desc" />
+	<action name="Generate_Cluster_logs" type="dist_pshell" nodes="HSA,HST,CMP,CTL" title="Generate Cluster Logs" value="get-clusterlog -uselocaltime -node localhost" />
+	<action name="Cluster_logs" type="File_Collector" title="Collect Cluster Logs" days="10" value="windows\cluster\reports\cluster.log" />	
+	<action name="System_Event_logs" type="File_Collector" title="Collect System Event Logs" days="999" value="Windows\System32\winevt\Logs\System.evtx" />
+	<action name="Application_event_logs" type="File_Collector" title="Collect Application Logs" days="999" value="Windows\System32\winevt\Logs\Application.evtx" />
+	<action name="System_Security_logs" type="File_Collector" title="Collect System Security Logs" days="999" value="Windows\System32\winevt\Logs\Security.evtx" />
+	<action name="Storage_Spaces_logs" type="File_Collector" title="Collect Storage Spaces (Storport) Logs" days="999" value="Windows\System32\winevt\Logs\Microsoft-Windows-Storage-Storport admin.evtx" />
+	<action name="Failover_Cluster_Event_logs" type="File_Collector" title="Collect Failover Cluster Event Logs" days="999" value="Windows\System32\winevt\Logs\Microsoft-Windows-FailoverClustering%4Operational.evtx" />
+	<action name="System_Setup_logs" type="File_Collector" title="Collect System Setup Logs" days="999" value="Windows\System32\winevt\Logs\Setup.evtx" />
+	<action name="DNS_Server_logs" type="File_Collector" title="Collect DNS Server Logs" days="999" value="Windows\System32\winevt\Logs\DNS Server.evtx" />
+	<action name="Directory_Service_logs" type="File_Collector" title="Collect Directory Service Logs" days="999" value="Windows\System32\winevt\Logs\Directory Service.evtx" />
+	<action name="IIS_event_logs" type="File_Collector" title="Collect IIS Logs" days="5" value="inetpub\logs\LogFiles\W3SVC1\*.log" />
+	<action name="PDW_Component_Failures_logs" type="File_Collector" title="Collect PDW Component Failures Logs" days="999" value="Windows\System32\winevt\Logs\PDW Component Failures.evtx" />
+	<action name="DWAgent_Activity_logs" type="File_Collector" title="Collect DWAgent Activity Logs" days="10" value="ProgramData\Microsoft\Microsoft Sql Server Parallel Data Warehouse\100\Logs\*sqldwagent.exe_activity*" />
+	<action name="PDW_Setup_logs" type="File_Collector" title="Collect PDW Setup Logs" days="10" value="ProgramData\Microsoft\Microsoft SQL Server Parallel Data Warehouse\100\Logs\Setup\*" />
+	<action name="PAV_logs" type="File_Collector" title="Collect PAV Logs" days="5" value="ProgramData\Microsoft SQL Server PDW Appliance Validator\Logs\0*\" />
+	<action name="Microsoft-Windows-Hyper-V-logs" type="File_Collector" title="Microsoft-Windows-Hyper-V-logs" days="999" value="Windows\System32\winevt\Logs\Microsoft-Windows-Hyper-V-*-Admin.evtx" />
+	<action name="SQL_System_Health" type="File_Collector" title="Collect SQL System Health Logs" days="10" value="MSSQL11.MSSQL*\MSSQL\LOG\system_health*" />
+	<action name="Setup_XML_Files" type="File_Collector" title="Collect Setup XML files" days="999" value="pdwinst\media\*.xml" />
+	<action name="SQLPDW10_XML_Files" type="File_Collector" title="Collect SQLPDW10 XML files" days="999" value="LOG_01\SQLPDW10\*.xml" />
+    <action name="Logs_Bundle" type="bundle" title="Logs Bundle" />
+    </option>
+	<option name="PDW Service Dumps">
+	<action name="SQL_Dumps" type="File_Collector" title="Collect SQL Dumps" days="10" value="\LOG_01\SQLPDW10\SQLDumper\MSSQL\LOG\*"/>
+	<action name="PDW_Engine_Dumps" type="File_Collector" title="Collect PDW Engine Dumps" days="10" value="\LOG_01\SQLPDW10\SQLDumper\sqldweng\*\"/>
+	<action name="PDW_DMS_Dumps" type="File_Collector" title="Collect PDW DMS Dumps" days="10" value="\LOG_01\SQLPDW10\SQLDumper\sqldwdms\*\"/>
+	<action name="PDW_Agent_Dumps" type="File_Collector" title="Collect PDW Agent Dumps" days="10" value="\LOG_01\SQLPDW10\SQLDumper\sqldwagent\*\"/>
+	<action name="Windows_Mini_Dumps" type="File_Collector" title="Collect Windows Mini Dumps" days="10" value="\Windows\MiniDumps\*.dmp"/>
+	<action name="Dumps_Bundle" type="bundle" title="Dumps Bundle" />
+	</option>
+		<option name="Query PDW">	
+		<action name="PDW_sp_statistics" type="query_pdw" title="PDW sp_statistics on all DB Tables" value="
+DECLARE @dbcounter int;
+SET @dbcounter = (select top 1 database_id from sys.databases where database_id > 4 order by database_id desc);
+DECLARE @i int = 4
+DECLARE @query varchar(1000)
+DECLARE @dbname varchar(100)
+WHILE @i &lt; @dbcounter
+BEGIN
+     SET @i = @i + 1
+     SET @query = (SELECT name from sys.databases where database_id=@i and database_id > 4)
+     SET @dbname = (@query)
+     SET @query = N'USE ' + @dbname + '; create table #sql_statements with (location=user_db, distribution=replicate)
+as
+( select row_number() over (order by a.name) sequence, (select db_name()) dbname, a.name tblname, ''EXEC sp_statistics '' + a.name as statement from sys.tables a )
+
+declare @nbr_statements int = (select count(*)  from #sql_statements)
+declare @a int  = 1
+while(@a &lt;= @nbr_statements)
+begin
+       declare @statement nvarchar(256)= (select statement from #sql_statements where sequence  = @a)
+       select ''Current Database and Table Name: '' + dbname + ''.dbo.'' + tblname from #sql_statements where sequence  = @a
+       exec (@statement)
+       set @a  += 1
+end
+drop table #sql_statements'
+EXEC (@query)
+END
+"/>
+		<action name="PDW_SHOWSPACEUSED_on_all_DBs" type="query_pdw" title="PDW SHOWSPACEUSED on all DBs" value="DECLARE @dbcounter int; SET @dbcounter = (select top 1 database_id from sys.databases where database_id > 4 order by database_id desc); DECLARE @i int = 4; DECLARE @query varchar(100); DECLARE @dbname varchar(100); WHILE @i &lt; @dbcounter BEGIN SET @i = @i + 1; SET @query = (SELECT name from sys.databases where database_id=@i and database_id > 4); SET @dbname = (@query); SET @query = N'USE ' + @dbname + '; DBCC PDW_SHOWSPACEUSED'; exec (@query); END"/>
+		<action name="PDW_SHOWSPACEUSED_on_all_DBs_Tables" type="query_pdw" title="PDW SHOWSPACEUSED on all DBs Tables" value="DECLARE @dbcounter int;
+SET @dbcounter = (select top 1 database_id from sys.databases where database_id > 4 order by database_id desc);
+DECLARE @i int = 4;
+DECLARE @query varchar(1000);
+DECLARE @dbname varchar(100);
+WHILE @i &lt;= @dbcounter
+BEGIN
+     SET @i = @i + 1
+     SET @query = (SELECT name from sys.databases where database_id=@i and database_id > 4)
+     SET @dbname = (@query)
+     SET @query = N'USE ' + @dbname + '; create table #sql_statements with (location=user_db, distribution=replicate)
+as
+( select row_number() over (order by a.name) sequence, (select db_name()) dbname, a.name tblname, ''DBCC PDW_SHOWSPACEUSED (['' + (select db_name()) + ''.dbo.'' + a.name + ''])'' as statement from sys.tables a )
+declare @nbr_statements int = (select count(*)  from #sql_statements)
+declare @a int  = 1
+while(@a &lt;= @nbr_statements)
+begin
+       declare @statement nvarchar(256)= (select statement from #sql_statements where sequence  = @a)
+       select ''Current Database and Table Name: '' + dbname + ''.dbo.'' + tblname from #sql_statements where sequence  = @a
+       exec (@statement)
+       set @a  += 1
+end
+drop table #sql_statements'
+EXEC (@query)
+END" />
+		<action name="PDW_SHOWPARTITIONSTATS_on_all_DBs_Tables" type="query_pdw" title="PDW_SHOWPARTITIONSTATS_on_all_DBs_Tables" value="DECLARE @dbcounter int;
+SET @dbcounter = (select top 1 database_id from sys.databases where database_id > 4 order by database_id desc);
+DECLARE @i int = 4;
+DECLARE @query varchar(1000);
+DECLARE @dbname varchar(100);
+WHILE @i &lt; @dbcounter
+BEGIN
+     SET @i = @i + 1;
+     SET @query = (SELECT name from sys.databases where database_id=@i and database_id > 4);
+     SET @dbname = (@query);
+     SET @query = N'USE ' + @dbname + '; create table #sql_statements with (location=user_db, distribution=replicate)
+as
+( select row_number() over (order by a.name) sequence, (select db_name()) dbname, a.name tblname, ''DBCC PDW_SHOWPARTITIONSTATS (['' + (select db_name()) + ''.dbo.'' + a.name + ''])'' as statement from sys.tables a );
+declare @nbr_statements int = (select count(*)  from #sql_statements);
+declare @a int  = 1;
+while(@a &lt;= @nbr_statements)
+begin
+       declare @statement nvarchar(256)= (select statement from #sql_statements where sequence  = @a);
+       select ''Current Database and Table Name: '' + dbname + ''.dbo.'' + tblname from #sql_statements where sequence  = @a;
+       exec (@statement);
+       set @a  += 1;
+end
+drop table #sql_statements'
+EXEC (@query);
+END" />
+		<action name="select_counts_on_all_DBs_Tables" type="query_pdw" title="select_counts_on_all_DBs_Tables" value="DECLARE @dbcounter int;
+SET @dbcounter = (select top 1 database_id from sys.databases where database_id > 4 order by database_id desc);
+DECLARE @i int = 4;
+DECLARE @query varchar(1000);
+DECLARE @dbname varchar(100);
+WHILE @i &lt; @dbcounter
+BEGIN
+     SET @i = @i + 1;
+     SET @query = (SELECT name from sys.databases where database_id=@i and database_id > 4);
+     SET @dbname = (@query);
+     SET @query = N'USE ' + @dbname + '; create table #sql_statements with (location=user_db, distribution=replicate)
+as
+( select row_number() over (order by a.name) sequence, (select db_name()) dbname, a.name tblname, ''SELECT COUNT_BIG(*) AS TotalRows FROM '' + (select db_name()) + ''.dbo.'' + a.name as statement from sys.tables a );
+declare @nbr_statements int = (select count(*)  from #sql_statements);
+declare @a int  = 1;
+while(@a &lt;= @nbr_statements)
+begin
+       declare @statement nvarchar(256)= (select statement from #sql_statements where sequence  = @a)
+       select ''Current Database and Table Name: '' + dbname + ''.dbo.'' + tblname from #sql_statements where sequence  = @a
+       exec (@statement)
+       set @a  += 1
+end
+drop table #sql_statements'
+EXEC (@query);
+END" />
+		<action name="PDW_Query_Bundle" type="bundle" title="PDW Query Bundle" />
+	</option>
+		<option name="Query CTL SQL Instance">
+		<action name="CTL_stats_last_update" type="query_ctl" title="CTL Stats Last Update" value="exec dbo.sp_msforeachdb @command1='use ?; select (SELECT DB_NAME()) as DB, name AS stats_name, STATS_DATE(object_id,stats_id) AS statistics_update_date from sys.stats'" />
+<action name="CTL_show_statistics" type="query_ctl" title="CTL Show Statistics on all DB Tables" value="
+DECLARE @dbcounter int;
+SET @dbcounter = (select top 1 database_id from sys.databases where database_id > 4 order by database_id desc);
+DECLARE @i int = 4
+DECLARE @query varchar(1000)
+DECLARE @dbname varchar(100)
+WHILE @i &lt; @dbcounter
+BEGIN
+     SET @i = @i + 1
+     SET @query = (SELECT name from sys.databases where database_id=@i and database_id > 4)
+     SET @dbname = (@query)
+     SET @query = N'USE ' + @dbname + '; 	 
+CREATE TABLE #sql_statements
+(
+id INT IDENTITY(1,1),
+dbName VARCHAR(150),
+tableName VARCHAR(150),
+statement VARCHAR(1000),
+)
+INSERT INTO #sql_statements (dbName, tableName , statement)
+SELECT (select db_name()) dbname, a.name, ''DBCC SHOW_STATISTICS ('' + a.name + '', '' + b.name + '')'' from sys.tables a, sys.stats b where a.object_id = b.object_id
+declare @nbr_statements int = (select count(*)  from #sql_statements)
+declare @a int  = 1
+while(@a &lt;= @nbr_statements)
+begin
+       declare @statement nvarchar(256)= (select statement from #sql_statements where id  = @a)
+       select ''Current Database and Table Name: '' + dbname + ''.dbo.'' + tableName from #sql_statements where id  = @a
+       exec (@statement)
+       set @a  += 1
+end
+drop table #sql_statements'
+EXEC (@query)
+END
+"/>
+		<action name="Databases CTL" type="query_ctl" title="CTL Node Instance Databases" value="select * from sys.databases" />
+		<action name="DB_Table_Info_CTL" type="query_ctl" title="Database Table Info CTL" value="exec dbo.sp_msforeachdb @command1='use ?; SELECT (SELECT DB_NAME() as DBName), * from sys.tables;'" />	
+		<action name="Fragmentation_DBCC_CTL" type="query_ctl" title="Fragmentation DBCC CTL" value="exec dbo.sp_msforeachdb @command1='use ?; DBCC SHOWCONTIG;'" />
+		<action name="Fragmentation_DMV_CTL" type="query_ctl" title="Fragmentation DMV CTL" value="exec dbo.sp_msforeachdb @command1='use ?; SELECT (SELECT DB_NAME() as DBName), * FROM sys.dm_db_index_physical_stats (NULL, NULL, NULL, NULL, NULL);'" />
+		<action name="Rarely_used_indexes_CTL" type="query_ctl" title="CTL Rarely used indexes" value="exec dbo.sp_msforeachdb @command1='use ?; select (SELECT DB_NAME() as DBName), * from sys.dm_db_index_usage_stats;'" />
+		<action name="Most_used_indexes_CTL" type="query_ctl" title="CTL Most used indexes" value="exec dbo.sp_msforeachdb @command1='use ?; select (SELECT DB_NAME() as DBName), * from sys.dm_db_index_operational_stats (NULL, NULL, NULL, NULL);'" />
+		<action name="Missing_indexes_CTL" type="query_ctl" title="CTL Missing indexes" value="exec dbo.sp_msforeachdb @command1='use ?; select (SELECT DB_NAME() as DBName), * from sys.dm_db_missing_index_details, sys.dm_db_missing_index_group_stats;'" />
+		<action name="CPU_aggregated_usage_by_cached_plans_with_SQL_text_CTL" type="query_ctl" title="CTL CPU aggregated usage by cached plans with SQL text" value="SELECT total_cpu_time, total_execution_count, number_of_statements, s2.text FROM (SELECT TOP 50 SUM(qs.total_worker_time) AS total_cpu_time, SUM(qs.execution_count) AS total_execution_count, COUNT(*) AS  number_of_statements, qs.sql_handle FROM sys.dm_exec_query_stats AS qs GROUP BY qs.sql_handle ORDER BY SUM(qs.total_worker_time) DESC) AS stats  CROSS APPLY sys.dm_exec_sql_text(stats.sql_handle) AS s2 " />
+	    <action name="Partitions_row_counts_CTL_node" type="query_ctl" title="Partitions Row Counts CTL Node" value="exec dbo.sp_msforeachdb @command1='use ?; 
+SELECT
+	  ''['' + (SELECT DB_NAME() as DBName) + ''].'' + QUOTENAME(SCHEMA_NAME(sOBJ.schema_id)) + ''.'' + QUOTENAME(sOBJ.name) AS [TableName]
+      , SUM(sPTN.Rows) AS [RowCount]
+FROM 
+      sys.objects AS sOBJ
+      INNER JOIN sys.partitions AS sPTN
+            ON sOBJ.object_id = sPTN.object_id
+WHERE
+      sOBJ.type = ''U''
+      AND sOBJ.is_ms_shipped = 0x0
+      AND index_id &lt; 2
+GROUP BY 
+      sOBJ.schema_id
+      , sOBJ.name
+ORDER BY [TableName];'
+" />
+			    <action name="Partition_Stats_CTL_node" type="query_ctl" title="Partition Stats CTL Node" value="exec dbo.sp_msforeachdb @command1='use ?; 
+		
+SELECT
+      ''['' + (SELECT DB_NAME() as DBName) + ''].'' + QUOTENAME(SCHEMA_NAME(sOBJ.schema_id)) + ''.'' + QUOTENAME(sOBJ.name) AS [TableName]
+      , SUM(sdmvPTNS.row_count) AS [RowCount]
+FROM
+      sys.objects AS sOBJ
+      INNER JOIN sys.dm_db_partition_stats AS sdmvPTNS
+            ON sOBJ.object_id = sdmvPTNS.object_id
+WHERE 
+      sOBJ.type = ''U''
+      AND sOBJ.is_ms_shipped = 0x0
+      AND sdmvPTNS.index_id &lt; 2
+GROUP BY
+      sOBJ.schema_id
+      , sOBJ.name
+ORDER BY [TableName]		
+'
+" />
+		<action name="query_CTL_Bundle" type="bundle" title="SQL CTL Bundle" />
+	</option>
+	<option name="Query CMP SQL Instances">
+		<action name="Databases_CMP" type="query_cmp" title="CMP Node Instance Databases" value="select * from sys.databases" />
+		<action name="DB_Table_Info_CMP" type="query_cmp" title="Database Table Info CMP" value="exec dbo.sp_msforeachdb @command1='use ?; SELECT (SELECT DB_NAME() as DBName), * from sys.tables;'" />	
+		<action name="CMP_stats_last_update" type="query_cmp" title="CMP Stats Last Update" value="exec dbo.sp_msforeachdb @command1='use ?; select (SELECT DB_NAME()) as DB, name AS stats_name, STATS_DATE(object_id,stats_id) AS statistics_update_date from sys.stats'" />
+		<action name="Fragmentation_DBCC_CMP" type="query_cmp" title="Fragmentation DBCC CMP" value="exec dbo.sp_msforeachdb @command1='use ?; DBCC SHOWCONTIG;'" />
+		<action name="Fragmentation_DMV_CMP" type="query_cmp" title="Fragmentation DMV CMP" value="exec dbo.sp_msforeachdb @command1='use ?; SELECT (SELECT DB_NAME() as DBName), * FROM sys.dm_db_index_physical_stats (NULL, NULL, NULL, NULL, NULL);'" />
+		<action name="Rarely_used_indexes_CMP" type="query_cmp" title="CMP arely used indexes" value="exec dbo.sp_msforeachdb @command1='use ?; select (SELECT DB_NAME() as DBName), * from sys.dm_db_index_usage_stats;'" />
+		<action name="Most_used_indexes_CMP" type="query_cmp" title="CMP Most used indexes" value="exec dbo.sp_msforeachdb @command1='use ?; select (SELECT DB_NAME() as DBName), * from sys.dm_db_index_operational_stats (NULL, NULL, NULL, NULL);'" />
+		<action name="CPU_aggregated_usage_by_cached_plans_with_SQL_text_CMP" type="query_cmp" title="CMP CPU aggregated usage by cached plans with SQL text" value="SELECT total_cpu_time, total_execution_count, number_of_statements, s2.text FROM (SELECT TOP 50 SUM(qs.total_worker_time) AS total_cpu_time, SUM(qs.execution_count) AS total_execution_count, COUNT(*) AS  number_of_statements, qs.sql_handle FROM sys.dm_exec_query_stats AS qs GROUP BY qs.sql_handle ORDER BY SUM(qs.total_worker_time) DESC) AS stats  CROSS APPLY sys.dm_exec_sql_text(stats.sql_handle) AS s2 " />
+		<action name="Table_size_CMP" type="query_cmp" title="CMP Table size" value="exec dbo.sp_msforeachdb @command1='use ?; SELECT (SELECT DB_NAME() as DBName), t.NAME AS TableName, p.rows AS RowCounts, SUM(a.total_pages) * 8 AS TotalSpaceKB, SUM(a.used_pages) * 8 AS UsedSpaceKB, (SUM(a.total_pages) - SUM(a.used_pages)) * 8 AS UnusedSpaceKB FROM sys.tables t INNER JOIN sys.indexes i ON t.OBJECT_ID = i.object_id INNER JOIN sys.partitions p ON i.object_id = p.OBJECT_ID AND i.index_id = p.index_id INNER JOIN sys.allocation_units a ON p.partition_id = a.container_id WHERE t.is_ms_shipped = 0 AND i.OBJECT_ID > 255 GROUP BY t.Name, p.Rows ORDER BY t.Name'" />
+	    <action name="Partitions_row_counts_CMP_node" type="query_cmp" title="Partitions Row Counts CMP Node" value="exec dbo.sp_msforeachdb @command1='use ?; 
+SELECT
+	  ''['' + (SELECT DB_NAME() as DBName) + ''].'' + QUOTENAME(SCHEMA_NAME(sOBJ.schema_id)) + ''.'' + QUOTENAME(sOBJ.name) AS [TableName]
+      , SUM(sPTN.Rows) AS [RowCount]
+FROM 
+      sys.objects AS sOBJ
+      INNER JOIN sys.partitions AS sPTN
+            ON sOBJ.object_id = sPTN.object_id
+WHERE
+      sOBJ.type = ''U''
+      AND sOBJ.is_ms_shipped = 0x0
+      AND index_id &lt; 2
+GROUP BY 
+      sOBJ.schema_id
+      , sOBJ.name
+ORDER BY [TableName];'
+" />
+			    <action name="Partition_Stats_CMP_node" type="query_cmp" title="Partition Stats CMP Node" value="exec dbo.sp_msforeachdb @command1='use ?; 
+		
+SELECT
+      ''['' + (SELECT DB_NAME() as DBName) + ''].'' + QUOTENAME(SCHEMA_NAME(sOBJ.schema_id)) + ''.'' + QUOTENAME(sOBJ.name) AS [TableName]
+      , SUM(sdmvPTNS.row_count) AS [RowCount]
+FROM
+      sys.objects AS sOBJ
+      INNER JOIN sys.dm_db_partition_stats AS sdmvPTNS
+            ON sOBJ.object_id = sdmvPTNS.object_id
+WHERE 
+      sOBJ.type = ''U''
+      AND sOBJ.is_ms_shipped = 0x0
+      AND sdmvPTNS.index_id &lt; 2
+GROUP BY
+      sOBJ.schema_id
+      , sOBJ.name
+ORDER BY [TableName]		
+'
+" />
+		<action name="Query_CMP_Bundle" type="bundle" title="SQL CMP Bundle" />
+	</option>
+   <option name="Custom Bundles">
+	  <action name="Loader_Bundle" type="Custom_bundle" title="Loader Bundle" value="Info_bundle,Workload_bundle,Health_Bundle,DMV_Bundle,SQL_logs,DMS_Movement_logs,Engine_Server_logs,Engine_Movement_logs,Generate_Cluster_logs,Cluster_logs,Get_OS_event_logs_DMV,Event_logs,Application_logs,PDW_Component_Failures_logs" />
+	  <action name="Hardware_bundle" type="Custom_bundle" title="Hardware Bundle" value="PDW_node_list,Last_Boot_Time,failovers,SystemInfo,Health_bundle,pdw_health_alerts,Generate_Cluster_logs,Cluster_logs,Event_logs,PDW_Component_Failures_logs,DWAgent_Activity_logs" />	  
+	  <action name="Query_Performance_bundle" type="Custom_bundle" title="Query Performance Bundle" value="Workload_Bundle,DMV_Bundle,dm_pdw_errors,SQL_logs,Engine_Server_logs,SQL_System_Health,PDW_sp_statistics,PDW_SHOWPARTITIONSTATS_on_all_DBs_Tables,CTL_stats_last_update,Fragmentation_DMV_CMP,Rarely_used_indexes_CMP,Most_used_indexes_CMP,Missing_indexes_CMP,Table_size_CMP" />
+	  <action name="Table_health_bundle" type="Custom_bundle" title="Table Health Bundle" value="Engine_Server_logs,SQL_logs,Event_logs,Application_logs,PDW_Component_Failures_logs,DWAgent_Activity_logs,Dumps_Bundle,Database_Table_GUID_Mappings,PDW_SHOWSPACEUSED_on_all_DBs_Tables,PDW_SHOWPARTITIONSTATS_on_all_DBs_Tables,PDW_SHOWSPACEUSED_on_all_DBs_Tables,PDW_SHOWPARTITIONSTATS_on_all_DBs_Tables,Table_size,Partitions_row_counts_CTL_node,Partitions_row_counts_CMP_node,Partition_Stats_CTL_node,Partition_Stats_CMP_node,CTL_stats_last_update,Fragmentation_DBCC_Ctl,Fragmentation_DMV_CTL,Fragmentation_DBCC_CMP,Fragmentation_DMV_CMP,PDW_sp_statistics,CTL_show_statistics" />
+	  <action name="Info_Health_Logs_CTL_and_CMP_Bundle" type="Custom_bundle" title="Info, Health, Logs, CTL and CMP Bundle" value="Query_CTL_Bundle,query_CMP_Bundle,Logs_Bundle,Health_Bundle,Info_Bundle" />
+	  <action name="Failover_bundle" type="Custom_bundle" title="Failover Bundle" value="Engine_Server_logs,DMS_Movement_logs,DWAgent_Activity_logs,PDW_Component_Failures_logs,Microsoft-Windows-Hyper-V-logs,Vstat,Failovers,Cluster_state,Unexpected_Shutdown,Bugchecks,Resource_Failovers,pdw_errors,active_alerts,Generate_Cluster_logs,Cluster_logs,Event_logs,Application_logs,Failover_Cluster_Event_logs" />
+   	  <action name="Large_Bundle" type="Custom_bundle" title="Large Bundle" value="Info_Bundle,Workload_Bundle,Health_Bundle,DMV_Bundle,Logs_Bundle,Dumps_Bundle" />
+	  <action name="Minimal_Bundle" type="Custom_bundle" title="Minimal Bundle" value="Info_Bundle,Workload_Bundle,Health_Bundle,SQL_logs,DMS_Movement_logs,Engine_Server_logs,Engine_Movement_logs,OS_event_logs_DMV" />
+	  <action name="Absolute_bundle" type="Custom_bundle" title="Absolute Bundle (Massive!)" value="Info_Bundle,Firmware_Drivers_Bundle,Workload_Bundle,Health_Bundle,DMV_Bundle,Logs_Bundle,Dumps_Bundle,PDW_Query_Bundle,Query_CTL_Bundle,Query_CMP_Bundle" />
+  	  <action name="DWAgent_Bundle" type="Custom_bundle" title="DWAgent Bundle" value="info_bundle,health_bundle,event_logs,application_logs,dwagent_activity_logs" />
+   </option>  
+</menu>
