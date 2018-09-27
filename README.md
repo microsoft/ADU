@@ -1,7 +1,7 @@
 # ADU - Analytics Platform System Appliance Diagnostic Utility with Wellness Checks
 
 ### Usage
-You can download the newest releast from the 'release' page. Extract the downloaded folder ADU to HST01 under C:\. It should be at C:\ADU
+You can download the newest releast from the 'release' page. Extract the downloaded folder ADU-(version) to HST01 under C:\. The name of the ADU folder is not important unless you have set up automated jobs that depend on a particular folder structure. By default it will look like this: C:\ADU-4.5\ADU.ps1
 
 Execute it using PowerShell: C:\ADU\ADU.ps1
 
