@@ -1,14 +1,66 @@
+# ADU - Analytics Platform System Appliance Diagnostic Utility with Wellness Checks
 
-# Contributing
+### Usage
+You can download the newest releast from the 'release' page. Extract the downloaded folder ADU to HST01 under C:\. It should be at C:\ADU
 
-This project welcomes contributions and suggestions.  Most contributions require you to agree to a
-Contributor License Agreement (CLA) declaring that you have the right to, and actually do, grant us
-the rights to use your contribution. For details, visit https://cla.microsoft.com.
+Execute it using PowerShell: C:\ADU\ADU.ps1
 
-When you submit a pull request, a CLA-bot will automatically determine whether you need to provide
-a CLA and decorate the PR appropriately (e.g., label, comment). Simply follow the instructions
-provided by the bot. You will only need to do this once across all repos using our CLA.
+A menu will be displayed to select your options. All of these are safe to run while the appliance is online, but as a best practice you should not be making changes to the appliance under the highest volume times due to possible performance impact on the appliance or diagnostic tool. 
 
-This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/).
-For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or
-contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
+## Functionality
+* **Diagnostics Collection**: Collect logs and diagnostic data from appliance
+* **Distributed command**: Run a command on all nodes or a subset of nodes.
+* **Check WMI Leak**: Checks that WMI has not had any leaks and fixes it if required (online)
+* **Fix Network Connection Profile**: Checks for adapters on the wrong profile and attempts to repair it (onlin)
+* **Get Network adapter Config**: Retrieves the IP configuration from all network adapters in the appliance
+* **Manage Performance Counters**: Turn performance counters on or off on all nodes of the appliance. 
+* **Publish PDW XMLs**: Copy one set of XMLs out to the rest of the servers. 
+* **Set External Time Source**: Will ask for an NTP server and attempt to set the appliance to sync to that source
+* **All Table Sizes**: Collects size and rowcount for all tables in selected database (or all)
+* **Audit SQL Security Logs**:
+* **Backup Test**:
+* **Database Space Report**: Retrieves used and unused database space including the specified space when DB was created.
+* **Distributed Table Sizes**: Collects size of all distributed tables in selected database (or all)
+* **Failed Data Loads**:
+* **Generate CSV from XMLS (Beta)**:
+* **Last Modified Statistics**: Collects the last modified date for all statistics on all tables in the specified database (or all)
+* **Orphaned Table Listing**: Checks all databases for orphaned tables
+* **Replicated Table Sizes**: Collects size of all replicated tables. Generally to make sure none are too large.
+* **Replicated vs Distributed space by filegroup**: Collects the space usage by filegroup
+* **Run PAV**: Runs Appliance Validator
+* **Table Info**:
+* **Table Skew**: Collects table skew for all tables in specified database (or all)
+* **Add Canpool Disks to storage pool**: Adds any disks that are not part of the storage pool to the storage pool
+* **Align Disks**: Aligns CSVs to their proper owners for best performance
+* **Data Volume Utilization**: Returns space usage from the volume level
+* **Remove Lost Communication Disks**: Removes any metadata leftover form removed disks
+* **Storage Health Check**: Runs a health check against the storage subsystem. Results in HTML
+* **Update Storage Cache**: Updates storage cache on all physical servers
+* **Wellness Checks**: A gui will come up so you can choose what tests you want. Details below. 
+
+## Wellness Checks
+Wellness checks will open a gui where you can select the tests you would like to run. The output will be in HTML format, but some of it is best copied into excel for in depth review of the results.
+
+* **Run PAV**: Run Appliance Validator from HST01
+* **Analyze PAV Results**: Analyze PAV results and put them in a readable format
+* **Active Alerts**: Collect any current active PDW alerts
+* **PDW Password Expiry**: Check for windows users passwords expiring in the next 7 days
+* **C Drive Free Space**: Checks that all servers/VMs have adequate free space
+* **D Drive Free Space**: Checks that all servers/VMs have adequate free space
+* **WMI Health**: Checks that WMI has not had any leaks
+* **Replicated Table Sizes**: Checks for large replicated tables
+* **Statistics Accuracy**: Checks the accuracy of existing statistics
+* **CCI Health**: Checks the health of Clustered Columnstore Indexes
+* **Unhealthy Physical Disks**: Checks for physical disks in unhealhty state
+* **Retired Physical Disks**: Checks for physical disks that have been retired
+* **Disks with Canpool True**: Checks for physical disks that are not in the storage pool
+* **Unhealthy Virtual Disks**: Checks for unhealthy virtual disks
+* **CSV's Online**: Checks that all CSV's are online
+* **Unhealthy Storage Pools**: Checks that storage pools are healthy
+* **Number Physical Disks in Virtual Disks**: Checks that every virtual disk has 2 physical disks
+* **Physical Disk Reliability Counters**: Checks if reliability counters indicate an iminent disk failure
+* **Orphaned Tables**: Checks for orphaned tables in any database
+* **Data Skew**: Checks that data skew is below a set threshold for all tables all databases
+* **Network Adapter Profile**: Checks that network adapters are all on the domain profile.
+* **Time Sync Configuration**: Checks that the appliance is syncing to an NTP server
+* **Nullable Distribution Columns**: Checks for any nullable distribution columns
