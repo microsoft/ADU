@@ -8,7 +8,12 @@ Execute it using PowerShell: C:\ADU-4.5\ADU.ps1
 
 A menu will be displayed to select your options. All of these are safe to run while the appliance is online, but as a best practice you should not be making changes to the appliance under the highest volume times due to possible performance impact on the appliance or diagnostic tool. 
 
+
+
 ## Functionality
+
+* **PRE-RELEASE: INSTALL_WINDOWS_UPDATES**: install windows updates that have been downloaded through WSUS, but do not reboot. THis can be performed online. This feature has been tested on AU5 and is still in pre-release form. Contact Nicksalc for help using it pre-release form.
+
 * **Diagnostics Collection**: Collect logs and diagnostic data from appliance
 * **Distributed command**: Run a command on all nodes or a subset of nodes.
 * **Check WMI Leak**: Checks that WMI has not had any leaks and fixes it if required (online)
