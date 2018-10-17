@@ -12,7 +12,7 @@ A menu will be displayed to select your options. All of these are safe to run wh
 
 ## Functionality
 
-* **PRE-RELEASE: INSTALL_WINDOWS_UPDATES**: install windows updates that have been downloaded through WSUS, but do not reboot. THis can be performed online. This feature has been tested on AU5 and is still in pre-release form. Contact Nicksalc for help using it pre-release form.
+* **PRE-RELEASE: INSTALL_WINDOWS_UPDATES**: install windows updates that have been downloaded through WSUS, but does not reboot. This tool can be ran while the applaince is online. This feature has been tested on AU5 and is still in pre-release form. Contact Nicksalc for help using it pre-release form.
 
 * **Diagnostics Collection**: Collect logs and diagnostic data from appliance
 * **Distributed command**: Run a command on all nodes or a subset of nodes.
