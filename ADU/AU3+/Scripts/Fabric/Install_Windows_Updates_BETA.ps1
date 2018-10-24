@@ -65,6 +65,10 @@ Invoke-Command -ComputerName $fullNodeList -ScriptBlock $StartTaskCommand
 $CurrentlyRunningNodelist = $fullNodeList
 $CompletedNodeList=@()
 $checktaskState = {(Get-ScheduledTask InstallWindowsUpdates).state}
+
+Write-Progress -Activity "Currently Installing Updates:" -status "$CurrentlyRunningNodelist " -PercentComplete 0 
+Write-progress -Activity "Completed:" -status "$CompletedNodeList " -ID 1
+
 do
 {
     foreach ($node in $CurrentlyRunningNodelist)
