@@ -1,0 +1,2 @@
+C:\PDWINST\media
+C:\Program Files\Microsoft SQL Server Parallel Data Warehouse

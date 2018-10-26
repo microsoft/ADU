@@ -1,0 +1,1 @@
+HKLM:SOFTWARE\Microsoft\Microsoft SQL Server Parallel Data Warehouse
