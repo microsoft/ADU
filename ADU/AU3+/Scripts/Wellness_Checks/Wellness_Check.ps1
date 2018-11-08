@@ -1758,18 +1758,16 @@ Function StatsAccuracyTest
                 {
                     $result.CTL_ROW_COUNT = $result.CMP_ROW_COUNT
                 }
-                [int]$percentDiff = ($diff / $result.CTL_ROW_COUNT * 100)
+                $percentDiff = ($diff / $result.CTL_ROW_COUNT * 100)
                 if ($percentDiff -gt 10)
                 {
                     $result | add-member -NotePropertyName "Difference" -NotePropertyValue "$diff"
-		    $result | add-member -NotePropertyName "Percent incorrect" -NotePropertyValue "$percentDiff%"
+					$result | add-member -NotePropertyName "Percent incorrect" -NotePropertyValue "$percentDiff%"
                     $result | add-member -NotePropertyName "Database Name" -NotePropertyValue $dbname
                     $BadStats += $result                   
-		}
-
-
-            }
+				}
         }
+    }
 
         #work with results
 	    if ($BadStats) 
