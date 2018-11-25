@@ -28,7 +28,8 @@ $date = Get-Date -Format MMddyy-hhmmss
 #Set up variables
 $fullNodeList = getNodeList -Full
 $WsusPath = "C:\Wsus\" #path to store the WU scripts and logs for this tool
-$DomainAdminUser = "$(([string]($fullNodeList | select-string "-HST01")).split("-")[0])\Administrator"
+$DomainAdminUser = "$(([string]($fullNodeList | select-string "-HST01")).split("-")[0])\$env:username" #this will take the logged user.
+#$DomainAdminUser = "$(([string]($fullNodeList | select-string "-HST01")).split("-")[0])\Administrator"
 $DomainAdminPass = GetDomainPassword
 
 #create c:\wsus on all nodes
