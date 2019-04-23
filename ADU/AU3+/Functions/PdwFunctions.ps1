@@ -298,9 +298,9 @@ Function CheckPdwCredentials
 	}
 	
 	#check credentials work
-    $auth = sqlcmd -S "$pdwReg-ctl01,$port" -U $U -P $P -Q "select @@version" -I
-	
-	if ($auth | select-string "Microsoft Corporation Parallel Data Warehouse" ) 
+	#It needs a try catch
+	$auth = invoke-sqlcmd -query "select @@version" -serverInstance "$PdwReg-sqlctl01,$port" -username $u -password $P 	
+	if ($auth ) 
 	{
         write-host -ForegroundColor Green "PDW Credentials Verified"
 		return $true
@@ -579,10 +579,10 @@ function GetPdwVersion
 	$Pdwreg = GetPdwRegionName
 	
 	#return $PdwVersion
-	$PDWVersionInfo = sqlcmd -Q "Select @@Version" -S "$Pdwreg-sqlctl01,17001" -U $u -P $P -I
+	$PDWVersionInfo =  invoke-sqlcmd -query "select @@version" -serverInstance "$Pdwreg-sqlctl01,17001" -username $u -password $P 
 	
 	#parse out just the version number
-	$PdwVersion = $PDWVersionInfo.split(" ") | select-string -Pattern "\d{1,2}\.\d{1,2}\.\d{1,4}\.\d{1,2}"
+	$PdwVersion = $PDWVersionInfo.Column1.split(" ") | select-string -Pattern "\d{1,2}\.\d{1,2}\.\d{1,4}\.\d{1,2}"
 	$PdwVersion = $PdwVersion.toString()
 	
 	return $PDWVersion
@@ -680,9 +680,9 @@ Function GetHardwareVendor
 #*=============================================
 Function LoadSqlPowerShell
 {
-	Push-Location
-	Import-Module SQLPS -DisableNameChecking
-	Pop-Location
+	#Push-Location
+	#Import-Module SQLPS -DisableNameChecking
+	#Pop-Location
 }
 
 #*=============================================

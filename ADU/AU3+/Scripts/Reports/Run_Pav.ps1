@@ -108,7 +108,7 @@ function RunPav
 	
 	#create the cred object
 	$secpasswd = ConvertTo-SecureString "$domPass" -AsPlainText -Force
-	$domainCred = New-Object System.Management.Automation.PSCredential("$fabreg\Administrator",$secpasswd)
+	$domainCred = New-Object System.Management.Automation.PSCredential("$fabreg\$env:username",$secpasswd)
 	
 	#start the CTL01 pssession
 	Write-host "`nEntering CTL01 PSSession..."

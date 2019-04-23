@@ -230,7 +230,7 @@ Function ActiveAlerts
         "
 
         #Run the query 
-        LoadSqlPowerShell
+        #LoadSqlPowerShell
         $activeAlerts = Invoke-Sqlcmd -QueryTimeout 0 -ServerInstance "$PdwDomainName-ctl01,17001" -query $ActiveAlertsQuery
 
         #work with resutls
@@ -1766,8 +1766,8 @@ Function StatsAccuracyTest
                     $result | add-member -NotePropertyName "Database Name" -NotePropertyValue $dbname
                     $BadStats += $result                   
 				}
+           }
         }
-    }
 
         #work with results
 	    if ($BadStats) 
@@ -2109,7 +2109,7 @@ Function DataSkewTest
     }
 
     Write-Host -ForegroundColor Cyan "`nLoading SQL PowerShell Module..."
-    LoadSqlPowerShell
+    #LoadSqlPowerShell
 
     #get dblist
     $dbQuery = "select name from sys.databases where name not in ('master','tempdb','stagedb','model','msdb','dwqueue','dwdiagnostics','dwconfiguration') order by name asc;"
