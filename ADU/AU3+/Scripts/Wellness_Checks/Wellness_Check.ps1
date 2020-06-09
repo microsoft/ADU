@@ -1141,6 +1141,8 @@ Function RunPAV
             PowerShell $aduPs1Path\Adu.ps1 -run_pav 
         }
         #PowerShell c:\adu\adu.ps1 -run_pav
+        #start WINRM
+        $PDWDomainName = GetPdwRegionName;Get-Service -Name winrm  -ComputerName "$PDWDomainName-CTL01" | Start-service
 }
 
 Function PAVTest
