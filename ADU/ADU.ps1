@@ -82,7 +82,7 @@ Param(
 ################################################################
 # Version Number - bump for any updates to any script in ADU!!!#
 ################################################################
-$aduVersion="v4.5"
+$aduVersion="v4.54"
 ################################################################
    
 #Set a global path variable for all scripts to use
