@@ -445,7 +445,8 @@ function CollectRawPhysicalDiskData
 	[String[]]$PhysNodelist = GetNodeList -fqdn -phys
 
 	#Add FQDN to the SP Owners nodelist
-	$SpOwnersArray = $SpOwnersArray | % {$_ + "." + $($PhysNodelist[0].split(".")[1]) + ".local"}
+	#$SpOwnersArray = $SpOwnersArray | % {$_ + "." + $($PhysNodelist[0].split(".")[1]) + ".local"}
+    $SpOwnersArray = $SpOwnersArray | % {$_ + $physNodeList[0].Replace($PhysNodelist[1].split(".")[0],"")}
 
 	$HsaNodeList = GetNodeList -FQDN -HSA
 
@@ -505,7 +506,8 @@ Function CollectRawCSVData
 	[String[]]$PhysNodelist = GetNodeList -fqdn -phys
 
 	#Add FQDN to the SP Owners nodelist
-	$SpOwnersArray = $SpOwnersArray | % {$_ + "." + $($PhysNodelist[0].split(".")[1]) + ".local"}
+	#$SpOwnersArray = $SpOwnersArray | % {$_ + "." + $($PhysNodelist[0].split(".")[1]) + ".local"}
+    $SpOwnersArray = $SpOwnersArray | % {$_ + $physNodeList[0].Replace($PhysNodelist[1].split(".")[0],"")}
 
 	$HsaNodeList = GetNodeList -FQDN -HSA	
 
@@ -535,7 +537,8 @@ Function CollectRawVirtualDiskData
 	[String[]]$PhysNodelist = GetNodeList -fqdn -phys
 
 	#Add FQDN to the SP Owners nodelist
-	$SpOwnersArray = $SpOwnersArray | % {$_ + "." + $($PhysNodelist[0].split(".")[1]) + ".local"}
+	#$SpOwnersArray = $SpOwnersArray | % {$_ + "." + $($PhysNodelist[0].split(".")[1]) + ".local"}
+    $SpOwnersArray = $SpOwnersArray | % {$_ + $physNodeList[0].Replace($PhysNodelist[1].split(".")[0],"")}
 
 	$HsaNodeList = GetNodeList -FQDN -HSA
 
@@ -578,7 +581,8 @@ Function CollectRawStoragePoolData
 	[String[]]$PhysNodelist = GetNodeList -fqdn -phys
 
 	#Add FQDN to the SP Owners nodelist
-	$SpOwnersArray = $SpOwnersArray | % {$_ + "." + $($PhysNodelist[0].split(".")[1]) + ".local"}
+	#$SpOwnersArray = $SpOwnersArray | % {$_ + "." + $($PhysNodelist[0].split(".")[1]) + ".local"}
+    $SpOwnersArray = $SpOwnersArray | % {$_ + $physNodeList[0].Replace($PhysNodelist[1].split(".")[0],"")}
 
 	$HsaNodeList = GetNodeList -FQDN -HSA
 
