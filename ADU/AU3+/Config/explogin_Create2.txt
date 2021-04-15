@@ -1,0 +1,320 @@
+CREATE PROCEDURE [dbo].[sp_explogin_APS]
+
+AS 
+BEGIN
+	
+	CREATE TABLE #APSLogin (
+		RowID						int	IDENTITY(1,1)	NOT NULL,
+		ScriptData					varchar(1024)		NOT NULL,
+		CheckSumValue				int					NULL)
+
+	DECLARE @name					sysname
+	DECLARE @type					varchar (1)
+	DECLARE @hasaccess				int
+	DECLARE @denylogin				int
+	DECLARE @is_disabled			int
+	DECLARE @PWD_varbinary			varbinary (256)
+	DECLARE @PWD_string				varchar (514)
+	DECLARE @SID_varbinary			varbinary (85)
+	DECLARE @SID_string				varchar (514)
+	DECLARE @tmpstr					varchar (1024)
+	DECLARE @is_policy_checked		varchar (3)
+	DECLARE @is_expiration_checked	varchar (3)
+
+	DECLARE @defaultdb				sysname
+	DECLARE @RoleName				sysname
+	DECLARE @IsSQLLogin				bit
+    DECLARE @userdbname				sysname 
+    DECLARE @SQLCmd					nvarchar(1024)
+	DECLARE @CreateUser				varchar(256)
+	DECLARE @spex_Parm				nvarchar(256) = '@CreateUser varchar(256) OUTPUT'
+
+
+
+    SET NOCOUNT ON
+
+-- **********************************************************************
+    SELECT  l.*
+        INTO #Server_Logins
+        FROM (
+            SELECT  [name],
+                    [principal_id],
+					[type],
+                    [sid],
+                    is_disabled,
+                    default_database_name,
+                    is_policy_checked,
+                    is_expiration_checked,
+                    password_hash,
+                    CAST(1 AS BIT) AS IsSQLLogin
+                FROM sys.sql_logins
+              UNION
+            SELECT  [name],
+                    [principal_id],
+					[type],
+                    [sid],
+                    is_disabled,
+                    default_database_name,
+                    CAST(NULL AS BIT) AS is_policy_checked,
+                    CAST(NULL AS BIT) AS is_expiration_checked,
+                    CAST(NULL AS VARBINARY(256)) AS password_hash,
+                    CAST(0 AS BIT) AS IsSQLLogin
+                FROM sys.server_principals
+                    WHERE [sid] NOT IN (SELECT [sid]
+                                            FROM sys.sql_logins) ) AS l
+        WHERE l.[name] != 'BUILTIN\Administrators'
+         AND  l.[name] NOT LIKE 'NT AUTHORITY%'
+         AND  l.[name] NOT LIKE 'NT SERVICE%'
+         AND  l.[name] NOT LIKE '##%'
+         AND  l.[name] NOT LIKE '%PdwControlNodeAccess'
+         AND  (l.[name] NOT LIKE 'l~_%'  ESCAPE '~' )
+         AND  l.[name] != 'mediumrc'
+         AND  l.[name] != 'xlargerc'
+         AND  l.[name] != 'pavuser'
+		 AND  l.[name] NOT LIKE ('%' + CAST(SERVERPROPERTY ('ComputerNamePhysicalNetBIOS') AS VARCHAR(128)) + '%')
+         AND  l.[name] != 'sa'
+		 AND  l.[type] IN ( 'S', 'G', 'U' )
+
+
+	SELECT  rm.member_principal_id AS principal_id, 
+            r.[name] AS [Role]
+        INTO #RoleMembers
+        FROM (
+            SELECT *
+                FROM sys.server_principals sp       
+                WHERE sp.[Type] = 'R') AS r
+            INNER JOIN sys.server_role_members rm
+                ON r.[sid] = rm.role_principal_id
+-- **********************************************************************
+	DECLARE db_curs CURSOR STATIC FOR 
+		SELECT [name] FROM sys.databases
+			WHERE database_id > 4
+				AND  name != 'DWDiagnostics'
+				AND  name != 'DWConfiguration'
+				AND  name != 'DWQueue'
+			ORDER BY [name]
+
+	OPEN db_curs 
+
+
+    DECLARE login_curs CURSOR STATIC FOR 
+        SELECT  [sid], 
+                [name], 
+				[type],
+                password_hash, 
+                COALESCE(default_database_name, 'master'), 
+                IsSQLLogin,
+                is_policy_checked,
+                is_expiration_checked
+            FROM #Server_Logins 
+            ORDER BY [name]
+
+    OPEN login_curs 
+    FETCH NEXT 
+        FROM login_curs 
+        INTO @SID_varbinary, @name, @type, @PWD_varbinary, @defaultdb, @IsSQLLogin, @is_policy_checked, @is_expiration_checked
+
+    IF (@@fetch_status = -1) 
+        BEGIN 
+            INSERT #APSLogin (ScriptData) VALUES('-- No login(s) found.' )
+            CLOSE login_curs 
+            DEALLOCATE login_curs 
+            RETURN -1 
+        END 
+
+
+    INSERT #APSLogin (ScriptData) VALUES( '/** Generated ' + CONVERT (VARCHAR(32), GETDATE()) + ' on ' + CAST(SERVERPROPERTY ('ServerName') AS VARCHAR(64)) + ' **/' )
+	INSERT #APSLogin (ScriptData) VALUES( '/**----------------------------------------------------------------------------**/' )
+    INSERT #APSLogin (ScriptData) VALUES( '/**    >>>>>>> NOTE - CONTENTS OF THIS SCRIPT MUST NOT BE MODIFIED <<<<<<<     **/' )
+    INSERT #APSLogin (ScriptData) VALUES( '/**    >>>>>>> NOTE - BUT - ROWS MAY BE DELETED                    <<<<<<<     **/' )
+    INSERT #APSLogin (ScriptData) VALUES( '/**----------------------------------------------------------------------------**/' )
+    INSERT #APSLogin (ScriptData) VALUES( '/** Copy this file to D:\PDWDiagnostics\Login on HST01 on the target Appliance **/' )
+    INSERT #APSLogin (ScriptData) VALUES( '/** And execute the Import_APS_Logins option from ADU on that Appliance.       **/' )
+    INSERT #APSLogin (ScriptData) VALUES( '/***** CREATE LOGINS *****/' )
+
+    WHILE @@fetch_status = 0 
+        BEGIN 
+            IF @IsSQLLogin = 0
+                BEGIN
+                    INSERT #APSLogin (ScriptData) VALUES( 'IF NOT EXISTS (SELECT * FROM sys.server_principals WHERE [name] = ''' + @name + ''') CREATE LOGIN [' + @name + '] FROM WINDOWS' )
+                 
+                END 
+            ELSE 
+                BEGIN -- SQL Server authentication 
+                    EXEC sp_hexadecimal @SID_varbinary, @SID_string OUT 
+
+                    IF (@PWD_varbinary IS NOT NULL) 
+                        BEGIN -- Non-null password 
+                            EXEC sp_hexadecimal @PWD_varbinary, @PWD_string OUT 
+                            SELECT @tmpstr = 'USE [master];CREATE LOGIN [' + @name + '] WITH PASSWORD=' + @PWD_string + ' HASHED, DEFAULT_DATABASE = [' + @defaultdb + ']'
+                        END 
+                    ELSE 
+                        BEGIN -- Null password 
+                            SELECT @tmpstr = 'USE [master];CREATE LOGIN [' + @name + '] WITH PASSWORD='''', DEFAULT_DATABASE = [' + @defaultdb + ']' 
+                        END 
+
+                    IF @is_policy_checked = 1
+                        BEGIN
+                            SELECT @tmpstr = @tmpstr + ', CHECK_POLICY = ON'
+                        END
+                    ELSE
+                        BEGIN
+                            SELECT @tmpstr = @tmpstr + ', CHECK_POLICY = OFF'
+                        END
+
+                    IF @is_expiration_checked = 1
+                        BEGIN
+                            SELECT @tmpstr = @tmpstr + ', CHECK_EXPIRATION = ON'
+                        END
+                    ELSE
+                        BEGIN
+                            SELECT @tmpstr = @tmpstr + ', CHECK_EXPIRATION = OFF'
+                        END
+
+                    INSERT #APSLogin (ScriptData) VALUES( @tmpstr + ', SID=' + @SID_string )
+                 
+                END 
+
+            FETCH NEXT FROM login_curs INTO @SID_varbinary, @name, @type, @PWD_varbinary, @defaultdb, @IsSQLLogin, @is_policy_checked, @is_expiration_checked
+        END 
+
+        INSERT #APSLogin (ScriptData) VALUES( '/***** SET SERVER ROLES *****/' )
+
+    FETCH FIRST FROM login_curs INTO @SID_varbinary, @name, @type, @PWD_varbinary, @defaultdb, @IsSQLLogin, @is_policy_checked, @is_expiration_checked
+
+    WHILE @@fetch_status = 0 
+        BEGIN 
+
+            SELECT @RoleName = 'securityadmin'
+            IF EXISTS ( SELECT  * 
+                            FROM #Server_Logins sl
+                                INNER JOIN #RoleMembers rm
+                                    ON sl.principal_id = rm.principal_id
+                            WHERE sl.[name] = @name
+                                AND  rm.[Role] = @RoleName)
+                BEGIN 
+                    INSERT #APSLogin (ScriptData) VALUES( 'exec master.dbo.sp_addsrvrolemember @loginame=''' + @name + ''', @rolename=''' + @RoleName + ''' ' )
+                             
+                END 
+
+            SELECT @RoleName = 'serveradmin'
+            IF EXISTS ( SELECT  * 
+                            FROM #Server_Logins sl
+                                INNER JOIN #RoleMembers rm
+                                    ON sl.principal_id = rm.principal_id
+                            WHERE sl.[name] = @name
+                                AND  rm.[Role] = @RoleName)
+                BEGIN 
+                    INSERT #APSLogin (ScriptData) VALUES( 'exec master.dbo.sp_addsrvrolemember @loginame=''' + @name + ''', @rolename=''' + @RoleName + ''' ' )
+                             
+                END 
+
+            SELECT @RoleName = 'setupadmin'
+            IF EXISTS ( SELECT  * 
+                            FROM #Server_Logins sl
+                                INNER JOIN #RoleMembers rm
+                                    ON sl.principal_id = rm.principal_id
+                            WHERE sl.[name] = @name
+                                AND  rm.[Role] = @RoleName)
+                BEGIN 
+                    INSERT #APSLogin (ScriptData) VALUES( 'exec master.dbo.sp_addsrvrolemember @loginame=''' + @name + ''', @rolename=''' + @RoleName + ''' ' )
+                             
+                END 
+
+            SELECT @RoleName = 'processadmin'
+            IF EXISTS ( SELECT  * 
+                            FROM #Server_Logins sl
+                                INNER JOIN #RoleMembers rm
+                                    ON sl.principal_id = rm.principal_id
+                            WHERE sl.[name] = @name
+                                AND  rm.[Role] = @RoleName)
+                BEGIN 
+                    INSERT #APSLogin (ScriptData) VALUES( 'exec master.dbo.sp_addsrvrolemember @loginame=''' + @name + ''', @rolename=''' + @RoleName + ''' ' )
+                             
+                END 
+
+            SELECT @RoleName = 'diskadmin'
+            IF EXISTS ( SELECT  * 
+                            FROM #Server_Logins sl
+                                INNER JOIN #RoleMembers rm
+                                    ON sl.principal_id = rm.principal_id
+                            WHERE sl.[name] = @name
+                                AND  rm.[Role] = @RoleName)
+                BEGIN 
+                    INSERT #APSLogin (ScriptData) VALUES( 'exec master.dbo.sp_addsrvrolemember @loginame=''' + @name + ''', @rolename=''' + @RoleName + ''' ' )
+                             
+                END 
+
+            SELECT @RoleName = 'dbcreator'
+            IF EXISTS ( SELECT  * 
+                            FROM #Server_Logins sl
+                                INNER JOIN #RoleMembers rm
+                                    ON sl.principal_id = rm.principal_id
+                            WHERE sl.[name] = @name
+                                AND  rm.[Role] = @RoleName)
+                BEGIN 
+                    INSERT #APSLogin (ScriptData) VALUES( 'exec master.dbo.sp_addsrvrolemember @loginame=''' + @name + ''', @rolename=''' + @RoleName + ''' ' )
+                             
+                END 
+
+            SELECT @RoleName = 'bulkadmin'
+            IF EXISTS ( SELECT  * 
+                            FROM #Server_Logins sl
+                                INNER JOIN #RoleMembers rm
+                                    ON sl.principal_id = rm.principal_id
+                            WHERE sl.[name] = @name
+                                AND  rm.[Role] = @RoleName)
+                BEGIN 
+                    INSERT #APSLogin (ScriptData) VALUES( 'exec master.dbo.sp_addsrvrolemember @loginame=''' + @name + ''', @rolename=''' + @RoleName + ''' ' )
+                             
+                END 
+
+            FETCH NEXT FROM login_curs INTO @SID_varbinary, @name, @type, @PWD_varbinary, @defaultdb, @IsSQLLogin, @is_policy_checked, @is_expiration_checked
+        END 
+
+        INSERT #APSLogin (ScriptData) VALUES( '/***** SET DB PERMISSIONS *****/' )
+
+        FETCH FIRST FROM login_curs INTO @SID_varbinary, @name, @type, @PWD_varbinary, @defaultdb, @IsSQLLogin, @is_policy_checked, @is_expiration_checked
+
+        WHILE @@fetch_status = 0 
+            BEGIN 
+
+				FETCH FIRST FROM db_curs INTO @userdbname
+
+				WHILE @@fetch_status = 0 
+					BEGIN 
+						SELECT @SQLCmd = 'USE [' + @userdbname + '];'
+						SELECT @SQLCmd = @SQLCmd + 'SELECT @CreateUser = ''USE [' + @userdbname + ']; CREATE USER ['' + d.[name] + ''] FOR LOGIN ['' + s.[name] + ''] WITH DEFAULT_SCHEMA =  ['' + d.default_schema_name + '']; '''
+						SELECT @SQLCmd = @SQLCmd + 'FROM sys.server_principals s '
+						SELECT @SQLCmd = @SQLCmd + 'INNER JOIN [' + @userdbname + '].sys.database_principals d '
+						SELECT @SQLCmd = @SQLCmd + 'ON s.sid = d.sid '
+						SELECT @SQLCmd = @SQLCmd + 'WHERE s.[name] = ''' + @name + '''; '
+						SELECT @CreateUser = ''
+						EXECUTE sp_executesql	
+								@SQLCmd,
+								@spex_Parm,
+								@CreateUser OUTPUT
+						IF @CreateUser <> ''
+							INSERT #APSLogin (ScriptData) VALUES( @CreateUser )
+
+						FETCH NEXT FROM db_curs INTO @userdbname
+					END
+
+                FETCH NEXT FROM login_curs INTO @SID_varbinary, @name, @type, @PWD_varbinary, @defaultdb, @IsSQLLogin, @is_policy_checked, @is_expiration_checked
+            END 
+
+    CLOSE login_curs 
+    DEALLOCATE login_curs 
+
+    CLOSE db_curs 
+    DEALLOCATE db_curs 
+
+    UPDATE #APSLogin	
+        SET CheckSumValue = BINARY_CHECKSUM(ScriptData)
+
+    SELECT ScriptData, CheckSumValue
+        FROM #APSLogin ORDER BY RowID
+
+    RETURN 0
+
+END

@@ -31,6 +31,13 @@
 #* Changes
 #* 1. Removed DESC from order by on SELECT db names
 #+ 2. Added '[]' around schema and table names
+#* Modified: 10/04/2018 sfacer
+#* Changes
+#* 1. Changed login failure error handling
+#* Modified: 08/06/2020 sfacer
+#* Changes
+#* 1. Fixed summarization of rows for # Distr & RR tables
+#* 2. Added Data space data to the output
 #*=============================================
 
 param([string]$username,[string]$password,[string]$database)
@@ -77,11 +84,26 @@ catch
 		write-eventlog -entrytype Error -Message "Failed to assign variables `n`n $_.exception" -Source $source -LogName ADU -EventId 9999	
 		Write-error "Failed to assign variables... Exiting" #Writing an error and exit
 	}
-if (!(CheckPdwCredentials -U $PDWUID -P $PDWPWD))
-{
+if ($PDWUID -eq $null -or $PDWUID -eq "")
+  {
+    Write-Host  "UserName not entered - script is exiting" -ForegroundColor Red
+    pause
+    return
+  }
+	
+if ($PDWPWD -eq $null -or $PDWPWD -eq "")
+  {
+    Write-Host  "Password not entered - script is exiting" -ForegroundColor Red
+    pause
+    return
+  }
 
-    write-error "failed to validate credentials"
-}
+if (!(CheckPdwCredentials -U $PDWUID -P $PDWPWD))
+  {
+    Write-Host  "UserName / Password authentication failed - script is exiting" -ForegroundColor Red
+    pause
+    return
+  }
 
 
 Write-Host -ForegroundColor Cyan "`nLoading SQL PowerShell Module..."
@@ -105,30 +127,35 @@ function ReplicatedTableSize()
                 Write-Progress -Activity "Looping through databases" -Status "$percentComplete Percent Complete" -PercentComplete $percentComplete
                 $outerLCV++
                 ##########################
-				Write-Host -ForegroundColor Cyan "Gathering data for DB: $db"
-				# Create a RepSizeTable
-				$tableRepSize = New-Object system.Data.DataTable "RepSizeTable"
-				$colDatabaseName = New-Object system.Data.DataColumn databaseName,([string])
-				$colTableName = New-Object system.Data.DataColumn tableName,([string])
-				$coltotalSpace = New-Object system.Data.DataColumn totalSpace,([decimal])
-				$coltotalRows = New-Object system.Data.DataColumn totalRows,([int64])
+                Write-Host -ForegroundColor Cyan "Gathering data for DB: $db"
+                # Create a RepSizeTable
+                $tableRepSize = New-Object system.Data.DataTable "RepSizeTable"
+                $colDatabaseName = New-Object system.Data.DataColumn databaseName,([string])
+                $colTableName = New-Object system.Data.DataColumn tableName,([string])
+                $coltotalSpace = New-Object system.Data.DataColumn totalSpace,([decimal])
+                $coldataSpace = New-Object system.Data.DataColumn dataSpace,([decimal])
+                $coltotalRows = New-Object system.Data.DataColumn totalRows,([int64])
                 $colTableType = New-Object system.Data.DataColumn tableType,([string])
-				$tableRepSize.columns.add($colDatabaseName)
-				$tableRepSize.columns.add($colTableName)
+                $tableRepSize.columns.add($colDatabaseName)
+                $tableRepSize.columns.add($colTableName)
                 $tableRepSize.columns.add($colTableType)
-				$tableRepSize.columns.add($coltotalSpace)	
-				$tableRepSize.columns.add($coltotalRows)	
-			
+                $tableRepSize.columns.add($coltotalSpace)
+                $tableRepSize.columns.add($coldataSpace)
+                $tableRepSize.columns.add($coltotalRows)	
+		
                 try
                 {
-				    $RepTbls = Invoke-Sqlcmd -querytimeout 0 -Query "use $db; SELECT '[' + sc.name + '].[' + ta.name + ']' as TableName FROM sys.tables ta INNER JOIN sys.partitions pa ON pa.OBJECT_ID = ta.OBJECT_ID INNER JOIN sys.schemas sc ON ta.schema_id = sc.schema_id, sys.pdw_table_mappings b, sys.pdw_table_distribution_properties c WHERE ta.is_ms_shipped = 0 AND pa.index_id IN (1,0) and ta.object_id = b.object_id AND b.object_id = c.object_id AND c.distribution_policy = '3' GROUP BY sc.name,ta.name ORDER BY SUM(pa.rows) DESC;" -ServerInstance "$PDWHOST,17001" -Username $PDWUID -Password $PDWPWD
-                    $distTbls = Invoke-Sqlcmd -querytimeout 0 -Query "use $db; SELECT '[' + sc.name + '].[' + ta.name + ']' TableName FROM sys.tables ta INNER JOIN sys.partitions pa ON pa.OBJECT_ID = ta.OBJECT_ID INNER JOIN sys.schemas sc ON ta.schema_id = sc.schema_id, sys.pdw_table_mappings b, sys.pdw_table_distribution_properties c WHERE ta.is_ms_shipped = 0 AND pa.index_id IN (1,0) and ta.object_id = b.object_id AND b.object_id = c.object_id AND c.distribution_policy = '2' GROUP BY sc.name,ta.name ORDER BY SUM(pa.rows) DESC;" -ServerInstance "$PDWHOST,17001" -Username $PDWUID -Password $PDWPWD
-                    $RRTbls = Invoke-Sqlcmd -querytimeout 0 -Query "use $db; SELECT '[' + sc.name + '].[' + ta.name + ']' TableName FROM sys.tables ta INNER JOIN sys.partitions pa ON pa.OBJECT_ID = ta.OBJECT_ID INNER JOIN sys.schemas sc ON ta.schema_id = sc.schema_id, sys.pdw_table_mappings b, sys.pdw_table_distribution_properties c WHERE ta.is_ms_shipped = 0 AND pa.index_id IN (1,0) and ta.object_id = b.object_id AND b.object_id = c.object_id AND c.distribution_policy = '4' GROUP BY sc.name,ta.name ORDER BY SUM(pa.rows) DESC;" -ServerInstance "$PDWHOST,17001" -Username $PDWUID -Password $PDWPWD
+                    $RepQry = "use $db; SELECT '[' + sc.name + '].[' + ta.name + ']' as TableName FROM sys.tables ta INNER JOIN sys.partitions pa ON pa.OBJECT_ID = ta.OBJECT_ID INNER JOIN sys.schemas sc ON ta.schema_id = sc.schema_id, sys.pdw_table_mappings b, sys.pdw_table_distribution_properties c WHERE ta.is_ms_shipped = 0 AND pa.index_id IN (1,0) and ta.object_id = b.object_id AND b.object_id = c.object_id AND c.distribution_policy = '3' GROUP BY sc.name,ta.name ORDER BY SUM(pa.rows) DESC;"
+                    $DistQry = "use $db; SELECT '[' + sc.name + '].[' + ta.name + ']' TableName FROM sys.tables ta INNER JOIN sys.partitions pa ON pa.OBJECT_ID = ta.OBJECT_ID INNER JOIN sys.schemas sc ON ta.schema_id = sc.schema_id, sys.pdw_table_mappings b, sys.pdw_table_distribution_properties c WHERE ta.is_ms_shipped = 0 AND pa.index_id IN (1,0) and ta.object_id = b.object_id AND b.object_id = c.object_id AND c.distribution_policy = '2' GROUP BY sc.name,ta.name ORDER BY SUM(pa.rows) DESC;"
+                    $RRQry = "use $db; SELECT '[' + sc.name + '].[' + ta.name + ']' TableName FROM sys.tables ta INNER JOIN sys.partitions pa ON pa.OBJECT_ID = ta.OBJECT_ID INNER JOIN sys.schemas sc ON ta.schema_id = sc.schema_id, sys.pdw_table_mappings b, sys.pdw_table_distribution_properties c WHERE ta.is_ms_shipped = 0 AND pa.index_id IN (1,0) and ta.object_id = b.object_id AND b.object_id = c.object_id AND c.distribution_policy = '4' GROUP BY sc.name,ta.name ORDER BY SUM(pa.rows) DESC;"
+                    $RepTbls = Invoke-Sqlcmd -querytimeout 0 -Query $RepQry -ServerInstance "$PDWHOST,17001" -Username $PDWUID -Password $PDWPWD
+                    $distTbls = Invoke-Sqlcmd -querytimeout 0 -Query $DistQry -ServerInstance "$PDWHOST,17001" -Username $PDWUID -Password $PDWPWD
+                    $RRTbls = Invoke-Sqlcmd -querytimeout 0 -Query $RRQry -ServerInstance "$PDWHOST,17001" -Username $PDWUID -Password $PDWPWD
 				}
                 catch	
                 {
-                    write-eventlog -entrytype Error -Message "failed gathering table list with Invoke-SQLCMD $db`n`n $_" -Source $source -LogName ADU -EventId 9999	
-                    Write-Error "failed gathering table list with Invoke-SQLCMD $db`n`n $_" -ErrorAction Stop
+                    write-eventlog -entrytype Error -Message "Failed gathering table list with Invoke-SQLCMD $db`n`n $_" -Source $source -LogName ADU -EventId 9999	
+                    Write-Error "Failed gathering table list with Invoke-SQLCMD $db`n`n $_" -ErrorAction Stop
                 }
                 
                 $RepTableCount = $RepTbls.tablename.count
@@ -162,7 +189,8 @@ function ReplicatedTableSize()
 					
 
 						# Varaibles
-						$totalDataSpace=0
+						$totalSpace=0
+						$dataSpace=0
 						[int64]$totalRows=0
 						$row = $tableRepSize.NewRow()
 						$row.databaseName = $db
@@ -178,26 +206,19 @@ function ReplicatedTableSize()
 								#Write-Host $Error
 							}
 			
-						# Sum totalDataSpace
-						$results.reserved_space |foreach { $totalDataSpace = $_ }
-						$totalDataSpace = ([System.Math]::Round($totalDataspace / 1024,1))
+						# Sum totalSpace
+						$results.reserved_space |foreach { $totalSpace = $_ }
+						$totalSpace = ([System.Math]::Round($totalSpace / 1024,1))
 						
-
-						if($totalDataSpace -gt 1)
-							{
-								#Write-Host -foreground red "Total data space:" $totalDataSpace "MB -Failed"
-								#"Total data space: $totalDataSpace MB -Failed" |out-file -append $OutputFile
-							}
-						else
-							{
-								#Write-Host "Total data space:" $totalDataSpace "MB"
-								#"Total data space: $totalDataSpace MB" |out-file -append $OutputFile
-							}
+						# Sum dataSpace
+						$results.data_space |foreach { $dataSpace = $_ }
+						$dataSpace = ([System.Math]::Round($dataSpace / 1024,1))
 										
 						#sum totalRows
 						$results.Rows |foreach { $totalRows = $_ }
 						$row.TableType = "Replicated"
-						$row.totalSpace = $totalDataSpace	
+						$row.totalSpace = $totalSpace	
+						$row.dataSpace = $dataSpace	 
 						$row.totalRows = $totalRows
                         
 						$tableRepSize.Rows.Add($row)
@@ -228,7 +249,8 @@ function ReplicatedTableSize()
 					
 
 						# Varaibles
-						$totalDataSpace=0
+						$totalSpace=0
+                        $dataSpace=0
 						[int64]$totalRows=0
 						$row = $tableRepSize.NewRow()
 						$row.databaseName = $db
@@ -244,26 +266,19 @@ function ReplicatedTableSize()
 								#Write-Host $Error
 							}
 			
-						# Sum totalDataSpace
-						$results.reserved_space |foreach { $totalDataSpace += $_ }
-						$totalDataSpace = ([System.Math]::Round($totalDataspace / 1024,1))
+						# Sum totalSpace
+						$results.reserved_space |foreach { $totalSpace += $_ }
+						$totalSpace = ([System.Math]::Round($totalSpace / 1024,1))
 						
-
-						if($totalDataSpace -gt 1)
-							{
-								#Write-Host -foreground red "Total data space:" $totalDataSpace "MB -Failed"
-								#"Total data space: $totalDataSpace MB -Failed" |out-file -append $OutputFile
-							}
-						else
-							{
-								#Write-Host "Total data space:" $totalDataSpace "MB"
-								#"Total data space: $totalDataSpace MB" |out-file -append $OutputFile
-							}
+						# Sum dataSpace
+						$results.data_space |foreach { $dataSpace += $_ }
+						$dataSpace = ([System.Math]::Round($dataSpace / 1024,1))
 										
 						#sum totalRows
-						$results.Rows |foreach { $totalRows = $_ }
+						$results.Rows |foreach { $totalRows += $_ }
 						$row.TableType = "Distributed"
-						$row.totalSpace = $totalDataSpace	
+						$row.totalSpace = $totalSpace	
+						$row.dataSpace = $dataSpace	 
 						$row.totalRows = $totalRows
                         
 						$tableRepSize.Rows.Add($row)
@@ -294,7 +309,8 @@ function ReplicatedTableSize()
 					
 
 						# Varaibles
-						$totalDataSpace=0
+						$totalSpace=0
+                        $dataSpace=0
 						[int64]$totalRows=0
 						$row = $tableRepSize.NewRow()
 						$row.databaseName = $db
@@ -310,38 +326,28 @@ function ReplicatedTableSize()
 								#Write-Host $Error
 							}
 			
-						# Sum totalDataSpace
-						$results.reserved_space |foreach { $totalDataSpace += $_ }
-						$totalDataSpace = ([System.Math]::Round($totalDataspace / 1024,1))
+						# Sum totalSpace
+						$results.reserved_space |foreach { $totalSpace += $_ }
+						$totalSpace = ([System.Math]::Round($totalSpace / 1024,1))
 						
-
-						if($totalDataSpace -gt 1)
-							{
-								#Write-Host -foreground red "Total data space:" $totalDataSpace "MB -Failed"
-								#"Total data space: $totalDataSpace MB -Failed" |out-file -append $OutputFile
-							}
-						else
-							{
-								#Write-Host "Total data space:" $totalDataSpace "MB"
-								#"Total data space: $totalDataSpace MB" |out-file -append $OutputFile
-							}
+						# Sum dataSpace
+						$results.data_space |foreach { $dataSpace += $_ }
+						$dataSpace = ([System.Math]::Round($dataSpace / 1024,1))
 										
 						#sum totalRows
-						$results.Rows |foreach { $totalRows = $_ }
+						$results.Rows |foreach { $totalRows += $_ }
 						$row.TableType = "Round Robin"
-						$row.totalSpace = $totalDataSpace	
+						$row.totalSpace = $totalSpace	
+						$row.dataSpace = $dataSpace	 
 						$row.totalRows = $totalRows
                         
 						$tableRepSize.Rows.Add($row)
 					}
 				#trying adding total rows
-				$tableRepSize |sort-object totalSpace -descending | ft databaseName, tableName, @{label = "Table Type" ; Expression = {$_.tableType}}, @{label = "Total Table Size MBs" ; Expression = {$_.totalSpace}},@{label = "Total Rows" ; Expression = {$_.totalRows}} -auto
-				$tableRepSize |sort-object totalSpace -descending | ft databaseName, tableName, @{label = "Table Type" ; Expression = {$_.tableType}}, @{label = "Total Table Size MBs" ; Expression = {$_.totalSpace}},@{label = "Total Rows" ; Expression = {$_.totalRows}} -auto |out-file -append $OutputFile	
+				$tableRepSize |sort-object totalSpace -descending | ft databaseName, tableName, @{label = "Table Type" ; Expression = {$_.tableType}}, @{label = "Total Table Size MBs" ; Expression = {$_.totalSpace}}, @{label = "Data Size MBs" ; Expression = {$_.dataSpace}}, @{label = "Total Rows" ; Expression = {$_.totalRows}} -auto
+				$tableRepSize |sort-object totalSpace -descending | ft databaseName, tableName, @{label = "Table Type" ; Expression = {$_.tableType}}, @{label = "Total Table Size MBs" ; Expression = {$_.totalSpace}}, @{label = "Data Size MBs" ; Expression = {$_.dataSpace}}, @{label = "Total Rows" ; Expression = {$_.totalRows}} -auto |out-file -append $OutputFile	
 				$replicatedtables += $tableRepSize
-				#ORIGINAL
-				#$tableRepSize |sort-object totalSpace -descending | ft databaseName, tableName, @{label = "Total Table Size MBs" ; Expression = {$_.totalSpace}} -auto
-				#$tableRepSize |sort-object totalSpace -descending | ft databaseName, tableName, @{label = "Total Table Size MBs" ; Expression = {$_.totalSpace}} -auto |out-file -append $OutputFile	
-				#$replicatedtables += $tableRepSize
+
 			}
 		}
     catch
@@ -371,7 +377,7 @@ function ReplicatedTableSize()
 		$body += "<h2>______________________________________________________</h2>"
 		if ($replicatedtables.count -gt 0)
 		{
-			$body += $replicatedtables |select databaseName, tableName, @{label = "Table Type" ; Expression = {$_.tableType}}, @{label = "Total Table Size (MB)" ; Expression = {$_.totalSpace}},@{label = "Total Rows" ; Expression = {$_.totalRows}} | ConvertTo-Html -Fragment 
+			$body += $replicatedtables |select databaseName, tableName, @{label = "Table Type" ; Expression = {$_.tableType}}, @{label = "Total Table Size (MB)" ; Expression = {$_.totalSpace}}, @{label = "Data Size MBs" ; Expression = {$_.dataSpace}}, @{label = "Total Rows" ; Expression = {$_.totalRows}} | ConvertTo-Html -Fragment 
 		}
 		else
 		{

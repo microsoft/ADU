@@ -1,0 +1,4 @@
+CREATE TABLE APSLogin (
+	RowID			int	IDENTITY(1,1)	NOT NULL,
+	ScriptData		varchar(1024)		NOT NULL,
+	CheckSumValue		int			NULL)

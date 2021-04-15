@@ -19,8 +19,9 @@
 #*=============================================
 #* Modified: 
 #* Changes:
-#* 
-#* 
+#* Modified: 10/04/2018 sfacer
+#* Changes
+#* 1. Changed login failure error handling
 #*=============================================
 
 param($username, $password)
@@ -46,11 +47,26 @@ if(!$username)
 else
 	{   $PDWUID = $username; $PDWPWD = $password }	
 
-if (!(CheckPdwCredentials -U $PDWUID -P $PDWPWD))
-{
+if ($PDWUID -eq $null -or $PDWUID -eq "")
+  {
+    Write-Host  "UserName not entered - script is exiting" -ForegroundColor Red
+    pause
+    return
+  }
+	
+if ($PDWPWD -eq $null -or $PDWPWD -eq "")
+  {
+    Write-Host  "Password not entered - script is exiting" -ForegroundColor Red
+    pause
+    return
+  }
 
-    write-error "failed to validate credentials"
-}
+if (!(CheckPdwCredentials -U $PDWUID -P $PDWPWD))
+  {
+    Write-Host  "UserName / Password authentication failed - script is exiting" -ForegroundColor Red
+    pause
+    return
+  }
 
 $PDWTable = ""
 $TotalTableSize = 0

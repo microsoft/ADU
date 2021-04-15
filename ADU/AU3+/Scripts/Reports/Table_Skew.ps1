@@ -34,6 +34,19 @@
 #* Modified: 05/31/2016 sfacer
 #* Changes:
 #* 1. Modified code to set '[]' delimiters properly, to correct handling '.'s in the Table Name
+#* Modified: 12/18/2017 sfacer
+#* Changes:
+#* 1. Added 'IF EXISTS ...' conditional code to DBCC PDW_SHOWSPACEUSED call
+#*    to handle scenario where the table dropped before the PDW_SHOWSPACEUSED query is run
+#* Modified: 02/20/2018 sfacer
+#* Changes:
+#* 1. Exclude databases being restored.
+#* Modified: 10/04/2018 sfacer
+#* Changes
+#* 1. Changed login failure error handling
+#* Modified: 06/01/2020 sfacer
+#* Changes
+#* 1. Added Progress display 
 #*=============================================
 
 param([string]$username,[string]$password,[string]$database)
@@ -78,11 +91,26 @@ catch
 		write-eventlog -entrytype Error -Message "Failed to assign variables `n`n $_.exception" -Source $source -LogName ADU -EventId 9999	
 		Write-error "Failed to assign variables... Exiting" #Writing an error and exit
 	}
-if (!(CheckPdwCredentials -U $PDWUID -P $PDWPWD))
-{
+if ($PDWUID -eq $null -or $PDWUID -eq "")
+  {
+    Write-Host  "UserName not entered - script is exiting" -ForegroundColor Red
+    pause
+    return
+  }
+	
+if ($PDWPWD -eq $null -or $PDWPWD -eq "")
+  {
+    Write-Host  "Password not entered - script is exiting" -ForegroundColor Red
+    pause
+    return
+  }
 
-    write-error "failed to validate credentials"
-}
+if (!(CheckPdwCredentials -U $PDWUID -P $PDWPWD))
+  {
+    Write-Host  "UserName / Password authentication failed - script is exiting" -ForegroundColor Red
+    pause
+    return
+  }
 
 Write-Host -ForegroundColor Cyan "`nLoading SQL PowerShell Module..."
 LoadSqlPowerShell
@@ -94,6 +122,14 @@ function GetTableSkew ()
 		#* Loop through DB's
 		foreach ($db in $databases) 
 			{
+                ##########################
+                #outer progress bar code
+                #must set $outerLCV to 0 outside outer loop
+                $innerLCV = 0
+                [int64]$percentComplete = ($outerLCV/$($databases.count))*100
+                Write-Progress -Activity "Looping through databases (Table Skew)" -Status "$percentComplete Percent Complete" -PercentComplete $percentComplete
+                $outerLCV++
+                ##########################
 				Write-Host -ForegroundColor Cyan "Gathering data for DB: $db"
 				try
 					{                           
@@ -135,19 +171,31 @@ function GetTableSkew ()
 				#* Loop through tables
 				foreach($tbl in $tbls.TableName) 
 					{
-						# Varaibles
+
+                        ########################
+                        #Inner progress bar code
+                        #must set $innerLCV to 0 outside inner loop, but inside outer loop.
+                        if ($($tbls.tablename.count) -eq 0)
+                        {
+                            "Found 0 tables"
+							[int64]$innerPercentComplete=100
+                        }
+                        else
+                        {
+					        [int64]$innerPercentComplete = ($innerLCV/$($tbls.tablename.count))*100
+                        }
+
+                         Write-Progress -id 1 -Activity "Looping through tables in $db" -Status "$innerPercentComplete Percent Complete" -PercentComplete $innerPercentComplete
+                         $innerLCV++
+                        ########################
+
+						# Variables
 						[long]$totalDataSpace=0
 						[long]$totalRows=0 
 						$MaxSize=$null
 						$MinSize=$null
 						$SkewPct=0
 				
-						# Print screen
-						#Write-Host "`n"
-						#Write-Host -ForegroundColor Cyan "Data for" $db".dbo."$tbl
-						#"Data for $db.dbo.$tbl" |out-file -append $OutputFile
-						#Write-Host -ForegroundColor Green "Table:" $tbl 
-						#"Table: $tbl" |out-file -append $OutputFile
 									
 						# Add databaseName and tableName to the DataSkewTable
 						$row = $tableDataSkew.NewRow()
@@ -156,7 +204,10 @@ function GetTableSkew ()
 						
                         try
                           {
-                            $results = Invoke-Sqlcmd -querytimeout 0 -Query "use $db; DBCC PDW_SHOWSPACEUSED (`"$tbl`");" -ServerInstance "$PDWHOST,17001" -Username $PDWUID -Password $PDWPWD #-ErrorAction SilentlyContinue
+                            ##$results = Invoke-Sqlcmd -querytimeout 0 -Query "use $db; DBCC PDW_SHOWSPACEUSED (`"$tbl`");" -ServerInstance "$PDWHOST,17001" -Username $PDWUID -Password $PDWPWD #-ErrorAction SilentlyContinue
+			    $Cmd = "use $db; IF EXISTS (SELECT x.* FROM (SELECT '[' + s.[name] + '].[' + o.[name] + ']' AS fqtn FROM SYS.Objects o INNER JOIN sys.schemas s ON o.[schema_id] = s.[schema_id]) AS x WHERE x.fqtn = '$tbl' ) DBCC PDW_SHOWSPACEUSED (`"$tbl`")"
+			    ##Write-Host $Cmd -ForegroundColor Cyan
+                            $results = Invoke-Sqlcmd -Query $Cmd -ServerInstance "$PDWHOST,17001" -Username $PDWUID -Password $PDWPWD #-ErrorAction SilentlyContinue
                           }
                         catch
                           {
@@ -215,7 +266,8 @@ function GetTableSkew ()
 						#" " |out-file -append $OutputFile
 						
 						$tableDataSkew.Rows.Add($row)
-				}         
+				}     
+                Write-Progress -id 1 -Activity "Looping through tables in $db" -Completed   
 						
 				#$tableDataSkew |ft databaseName, tableName, skewPct, minValue, maxValue, totalRows, totalSpace -auto
 				#$tableDataSkew | ft -Property databaseName, @{label = "Table Name" ; Expression = { if ($_.tableName -eq "customer") { $Host.ui.rawui.ForegroundColor = "red" ; $_.tableName; $Host.ui.rawui.ForegroundColor = "white" } ELSE { $Host.ui.rawui.foregroundcolor = "white" ; $_.tableName }}}, skewPct, minValue, maxValue, totalRows, totalSpace -auto
@@ -243,6 +295,7 @@ function GetTableSkew ()
 					}
 	
 			} 
+        Write-Progress -Activity "Looping through databases (Table Skew)" -Completed
 	
 		$date=Get-Date
 		$Appliance = (Get-Cluster).name.split("-")[0]
@@ -286,7 +339,7 @@ function GetTableSkew ()
 try
 	{
 		# Get list of database names
-		$dbs = Invoke-Sqlcmd -querytimeout 0 -Query "select name from sys.databases where name not in ('master','tempdb','stagedb') order by name;" -ServerInstance "$PDWHOST,17001" -Username $PDWUID -Password $PDWPWD
+		$dbs = Invoke-Sqlcmd -querytimeout 0 -Query "select name from sys.databases where name not in ('master','tempdb','stagedb', 'mavtdb') AND name NOT IN (select database_name from sys.pdw_loader_backup_runs where operation_type = 'RESTORE' AND end_time IS NULL ) order by name;" -ServerInstance "$PDWHOST,17001" -Username $PDWUID -Password $PDWPWD
 	}
 catch
 	{

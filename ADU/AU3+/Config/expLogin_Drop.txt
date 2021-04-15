@@ -1,0 +1,5 @@
+IF OBJECT_ID ('sp_explogin_APS') IS NOT NULL 
+DROP PROCEDURE sp_explogin_APS; 
+
+IF OBJECT_ID ('sp_hexadecimal') IS NOT NULL 
+DROP PROCEDURE sp_hexadecimal; 

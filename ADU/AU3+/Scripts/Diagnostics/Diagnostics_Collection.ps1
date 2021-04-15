@@ -444,7 +444,14 @@ function ExecuteAction([string]$UserInput1, [string]$UserInput2)
 				Write-EventLog -EntryType Information -message "Collecting Files from Filepath: $($QueryObject.value)" -Source $source -logname ADU -EventID 9999
 				try
 				{
-			    	CollectFiles -nodeList $FullNodeList -filepath $($QueryObject.value) -outputDir $outputDir -days $($QueryObject.days) -actionName $($QueryObject.name)
+                    if ($QueryObject.value -match "wer")
+                    {
+			    	    CollectFiles_FolderName -nodeList $FullNodeList -filepath $($QueryObject.value) -outputDir $outputDir -days $($QueryObject.days) -actionName $($QueryObject.name)
+                    }
+                    else
+                    {
+			    	    CollectFiles -nodeList $FullNodeList -filepath $($QueryObject.value) -outputDir $outputDir -days $($QueryObject.days) -actionName $($QueryObject.name)
+                    }
 				}
 				catch
 				{

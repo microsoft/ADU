@@ -198,16 +198,21 @@ New Action Template:
     <action name="Setup_XML_Files" type="File_Collector" title="Collect Setup XML files" days="999" value="pdwinst\media\*.xml" />
     <action name="SQLPDW10_XML_Files" type="File_Collector" title="Collect SQLPDW10 XML files" days="999" value="LOG_01\SQLPDW10\*.xml" />
     <action name="PDW_Setup_logs" type="File_Collector" title="Collect PDW Setup Logs" days="10" value="ProgramData\Microsoft\Microsoft SQL Server Parallel Data Warehouse\100\Logs\Setup\*" />
-	<action name="SQL_System_Health_extended_events" type="File_Collector" title="Collect SQL Server System Health Extended Events" days="999" value="MSSQL1*\MSSQL\LOG\system_health*.xel" />
+    <action name="SQL_System_Health_extended_events" type="File_Collector" title="Collect SQL Server System Health Extended Events" days="999" value="MSSQL1*\MSSQL\LOG\system_health*.xel" />
+    <action name="StorDiag_Admin" type="File_Collector" title="Collect StorDiag Admin Logs" days="999" value="Windows\System32\Winevt\Logs\Microsoft-Windows-Storage-ClassPnP%4Admin.evtx" />
+    <action name="StorDiag_Oper" type="File_Collector" title="Collect StorDiag Operational Logs" days="999" value="Windows\System32\Winevt\Logs\Microsoft-Windows-Storage-ClassPnP%4Operational.evtx" />
+    <action name="StorPort_Admin" type="File_Collector" title="Collect StorPort Admin Logs" days="999" value="Windows\System32\Winevt\Logs\Microsoft-Windows-Storage-Storport%4Admin.evtx" />
+    <action name="StorPort_Oper" type="File_Collector" title="Collect StorPort Operational Logs" days="999" value="Windows\System32\Winevt\Logs\Microsoft-Windows-Storage-Storport%4Operational.evtx" />
     <action name="Logs_Bundle" type="bundle" title="Logs Bundle" />
   </option>
   <option name="PDW Service Dumps">
-	<action name="CheckForDumps" type="dist_pshell" nodes="CTL" title="Check if dumps exist" value="gci G:\LOG_01\SQLPDW10\SQLDumper -Recurse *.mdmp" />
+    <action name="CheckForDumps" type="dist_pshell" nodes="CTL" title="Check if dumps exist" value="gci G:\LOG_01\SQLPDW10\SQLDumper -Recurse *.mdmp" />
     <action name="SQL_Dumps" type="File_Collector" title="Collect SQL Dumps" days="10" value="\LOG_01\SQLPDW10\SQLDumper\MSSQL\LOG\*" />
     <action name="PDW_Engine_Dumps" type="File_Collector" title="Collect PDW Engine Dumps" days="10" value="\LOG_01\SQLPDW10\SQLDumper\sqldweng\*\" />
     <action name="PDW_DMS_Dumps" type="File_Collector" title="Collect PDW DMS Dumps" days="10" value="\LOG_01\SQLPDW10\SQLDumper\sqldwdms\*\" />
     <action name="PDW_Agent_Dumps" type="File_Collector" title="Collect PDW Agent Dumps" days="10" value="\LOG_01\SQLPDW10\SQLDumper\sqldwagent\*\" />
     <action name="Windows_Mini_Dumps" type="File_Collector" title="Collect Windows Mini Dumps" days="10" value="\Windows\MiniDumps\*.dmp" />
+    <action name="WER_Dumps" type="File_Collector" title="Collect WER Dumps" days="10" value="ProgramData\Microsoft\Windows\WER\ReportQueue\*.wer" />
     <action name="Dumps_Bundle" type="bundle" title="Dumps Bundle" />
   </option>
   <option name="Query PDW">

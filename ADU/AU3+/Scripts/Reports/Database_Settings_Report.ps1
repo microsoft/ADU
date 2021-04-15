@@ -15,6 +15,9 @@
 #* Modified: 04/12/2017 sfacer
 #* Changes
 #* 1. Removed DESC from order by on SELECT db names
+#* Modified: 10/04/2018 sfacer
+#* Changes
+#* 1. Changed login failure error handling
 #*=============================================
 
 param([string]$username,[string]$password,[string]$database)
@@ -61,11 +64,26 @@ catch
 	}	
 
 
-if (!(CheckPdwCredentials -U $PDWUID -P $PDWPWD -pdwDomain $PdwDomainName))
-{
+if ($PDWUID -eq $null -or $PDWUID -eq "")
+  {
+    Write-Host  "UserName not entered - script is exiting" -ForegroundColor Red
+    pause
+    return
+  }
+	
+if ($PDWPWD -eq $null -or $PDWPWD -eq "")
+  {
+    Write-Host  "Password not entered - script is exiting" -ForegroundColor Red
+    pause
+    return
+  }
 
-    write-error "failed to validate credentials"
-}
+if (!(CheckPdwCredentials -U $PDWUID -P $PDWPWD))
+  {
+    Write-Host  "UserName / Password authentication failed - script is exiting" -ForegroundColor Red
+    pause
+    return
+  }
 
 
 ## Functions
@@ -93,7 +111,7 @@ Write-Host -ForegroundColor Cyan "`nLoading SQL PowerShell Module..."
 LoadSqlPowerShell
 
 ## Get list of database names
-$dbs = Invoke-Sqlcmd -Query "select name from sys.databases where name not in ('master', 'tempdb','stagedb') order by name;" -ServerInstance "$PDWHOST,17001" -Username $PDWUID -Password $PDWPWD
+$dbs = Invoke-Sqlcmd -Query "select name from sys.databases where name not in ('master', 'tempdb','stagedb', 'mavtdb') order by name;" -ServerInstance "$PDWHOST,17001" -Username $PDWUID -Password $PDWPWD
 
 
 do
@@ -217,3 +235,5 @@ do
 		Write-Host -ForegroundColor Cyan "`nOutput also located at: $OutputFile"
 		
 }while($ans -ne "q")
+
+Write-Progress -Activity "Looping through databases" -Completed

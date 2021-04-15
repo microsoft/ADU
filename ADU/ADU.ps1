@@ -47,6 +47,8 @@
 
 #Parameters that could be included for automatic run - needs to include possible params for subscripts
 Param(
+	[switch]$LoginAdmin, #Menu Usage: Include the Login processing scripts
+
 #These are parameters needed by sub-scripts
 	[switch]$offline, #Script(s) Used: Diagnostics Collection
 	[string]$Username=$null, #Script(s) Used: Diagnostics Collection
@@ -76,13 +78,17 @@ Param(
 	[switch]$Run_Pav, #Will kick off RunPAV
 	[switch]$Storage_Health_Check, #will kick off the storage health check
 	[switch]$Table_Skew, #will kick off table skew tool
-	[switch]$Wellness_Check #will kick off health check tool
+	[switch]$Wellness_Check, #will kick off health check tool
+
+#These parameters are for automated runs, not shown in the menu. Parameter name should be the same as script name
+    [switch]$TempDB_Space_Report, #will kick off the TempDB Space Report
+    [switch]$CCI_Health #will kick off the CCI Health
 	)
 
 ################################################################
 # Version Number - bump for any updates to any script in ADU!!!#
 ################################################################
-$aduVersion="v4.54"
+$aduVersion="v4.7"
 ################################################################
    
 #Set a global path variable for all scripts to use
@@ -175,7 +181,43 @@ Do
 		Write-Host "`n"
 		Write-warning "Not able to query win32_logicaldisk with wmi. `nThere is likely an issue with WMI on this server.`nSelect yes to continue then run `'Fix WMI Leak`' option of this tool to check/fix"
 	}
-	
+		
+	#If CCI_Health option is present - unhide the CCI_Health script, else hide it
+        if ($CCI_Health.IsPresent -eq $false) 
+          {
+            $ScriptToHide = get-item "$rootpath\Scripts\Reports\CCI_Health.ps1" -Force
+            $ScriptToHide.Attributes = "Hidden"
+          }
+        else
+          {
+            $ScriptToHide = get-item "$rootpath\Scripts\Reports\CCI_Health.ps1" -Force
+            $ScriptToHide.Attributes = "Normal"
+          }
+		
+	#If TempDB_Space_Report option is present - unhide the TempDB_Space_Report script, else hide it
+        if ($TempDB_Space_Report.IsPresent -eq $false) 
+          {
+            $ScriptToHide = get-item "$rootpath\Scripts\Reports\TempDB_Space_Report.ps1" -Force
+            $ScriptToHide.Attributes = "Hidden"
+          }
+        else
+          {
+            $ScriptToHide = get-item "$rootpath\Scripts\Reports\TempDB_Space_Report.ps1" -Force
+            $ScriptToHide.Attributes = "Normal"
+          }
+		
+	#If LoginAdmin option is present - unhide the Logins folder, else hide it
+        if ($LoginAdmin.IsPresent -eq $false)
+          {
+            $LoginFolderPath = get-item "$rootpath\Scripts\Logins" -Force
+            $LoginFolderPath.Attributes = "Hidden"
+          }
+        else
+          {
+            $LoginFolderPath = get-item "$rootpath\Scripts\Logins" -Force
+            $LoginFolderPath.Attributes = "Normal"
+          }
+
 	#Build the menu based on the folder structure of this tool
 	$MainMenuOptions=@()
 	$MainMenuOptions = GetFileAttributes "$rootpath\Scripts\"

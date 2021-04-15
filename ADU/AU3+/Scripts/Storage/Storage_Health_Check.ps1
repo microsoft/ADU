@@ -43,7 +43,13 @@
 #* Date: 4/22/2014
 #* Time: 10:42 AM
 #* ChangeList: Collect PD Data from all HSAs - modify output
-#* to include PSComputerName
+#* to include PSComputerName#* 
+#* 
+#* Date: 10/142019
+#* Simon Facer
+#* ChangeList:
+#* 1. Streamlined work-around processing for invalid # p-disk in v-disk, to read data one time only
+#* 2. Corrected reporting for invalid # p-disk in v-disk, to correctly report # of p-disks found
 #*=============================================
 . $rootPath\Functions\PdwFunctions.ps1
 
@@ -472,7 +478,6 @@ This is an online operation.
 		#variable to hold the unhealthy storage pools found
 		$VdsWrongNumPds=@()
 
-
         foreach ($vdisk in $VDiskData)
         {
             ##########################
@@ -482,28 +487,46 @@ This is an online operation.
             #a virtual disk may show that it has 0 physical disks
             if ($vdisk.PD_Count -eq 0) 
             {
-                Write-host -foregroundcolor Yellow "`nFound virtual disk $($vdisk.friendlyname) reporting 0 physical disks... This may happen due to a 
-reporting bug in storage spaces, usually after a disk replacement. Trying workaround to detect disks in this this virtual disk..."
+                if ($tblvpDiskData -eq $null) {
+                    
+                    write-host "`nFound 1 or more virtual disk reporting 0 physical disks - loading virtual-disk / physical-disk data for work-around" -ForegroundColor DarkYellow
+                    Write-Host "This may happen due to a reporting bug in storage spaces, usually after a disk replacement." -ForegroundColor DarkYellow
+
+                    $tblvpDiskData = @{}
+
+                    $disklist = Get-PhysicalDisk | ? {$_.PhysicalLocation -like "SES Enclosure*"} | sort FriendlyName
+
+                    foreach($pdisk in $disklist)
+		              {
+                        $vdiskname = ($pdisk | Get-VirtualDisk | select FriendlyName).FriendlyName
+		                $pdiskname =  ($pdisk | select FriendlyName).FriendlyName + " UID=" + ($pdisk | select uniqueId).uniqueId
+                        $tblvpDiskData.add($pdiskname, $vdiskname)
+  		              }
+
+                  }
+
+                Write-host -foregroundcolor Yellow "`nFound virtual disk $($vdisk.friendlyname) reporting 0 physical disks."
                 
                 $diskcount=0
-                Foreach ($disk in Get-PhysicalDisk)
-                {
-                    if (($disk | get-virtualdisk).friendlyname -eq $vdisk.friendlyname)
-                    {
-                        write-host "Found $($disk.FriendlyName) in $($vdisk.friendlyname)"
-                        $diskcount++
-                    }
-                }
+
+                $pDisksinvDisk =  $tblvpDiskData.GetEnumerator() | ?{$_.Value -eq $vdisk.friendlyname}
+                $diskcount = $pDisksinvDisk.Count
+                if ($diskcount -gt 0)
+                  {
+                    Write-Host "Found Physical Disks:" -ForegroundColor Yellow
+                    $pDisksinvDisk.GetEnumerator().name
+                  }
+
                 if ($diskcount -eq 2)
                 {
                     $bugWorkaroundWorked=$true
-                    Write-host -Foregroundcolor Green "Workaround correctly detected $diskcount disks in virtul disk $($vdisk.name)
+                    Write-host -Foregroundcolor Green "Workaround correctly detected $diskcount disks in virtual disk $($vdisk.name)
 No issues to report on in test results."
                 }
                 else
                 {
-                    $bugWorkaroundWorked=$fasle
-                    Write-host -Foregroundcolor Red "Workaround detected $diskcount disks in virtul disk $($vdisk.name). 
+                    $bugWorkaroundWorked=$false
+                    Write-host -Foregroundcolor Red "Workaround detected $diskcount disks in virtual disk $($vdisk.name). 
 Adding to test results"
                 }
             }
@@ -515,6 +538,7 @@ Adding to test results"
 		    {
 		        $NumPdsInVdTest.result = "Fail"
 				$OverallTest.result = "Fail"
+                $vdisk.PD_Count = $diskcount
 		        $VdsWrongNumPds += $vdisk
 		    }
 		}
@@ -697,7 +721,7 @@ WriteLatencyMax		< 100000			Warn for greater than 100000</pre>"
 	mkdir "D:\PdwDiagnostics\StorageReport\" -Force | out-null
 
 	#create the XML
-	$timestamp = get-date -Format MMddyy-hhmmss
+	$timestamp = get-date -Format yyyyMMddHHmmss
 	ConvertTo-Html -head $head -PostContent $body -body "<H1> Storage Subsystem Health Report $toolVersion</H1><H2>Appliance: $fabReg<br>Date: $timestamp</H2>" | out-file "D:\PdwDiagnostics\StorageReport\StorageReport$timestamp.htm"
 
 	#open the XML

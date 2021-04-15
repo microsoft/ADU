@@ -1,0 +1,154 @@
+IF OBJECT_ID ('sp_implogin_APS') IS NOT NULL 
+DROP PROCEDURE sp_implogin_APS;
+GO
+CREATE PROCEDURE [dbo].[sp_implogin_APS]
+
+AS
+BEGIN
+
+SET NOCOUNT ON
+
+DECLARE @SQLCmd			VARCHAR(1024)
+DECLARE @SQLCmd_2		VARCHAR(1024)
+DECLARE @Activity		INT = 0
+DECLARE @Login			VARCHAR(64)
+DECLARE @Start			INT
+DECLARE @End			INT
+DECLARE @LoginCount		INT = 0
+DECLARE @Msg			VARCHAR(1024)
+DECLARE @Msg2			VARCHAR(1024)
+
+-- The import process replaced ' characters with ~, to avoid SQL Errors
+-- Re-set the ~ characters to '
+UPDATE [dbo].[APSLogin]
+	SET [ScriptData] = REPLACE([ScriptData], '~', '''')
+
+CREATE TABLE #Logins (
+	[Login]				SYSNAME )
+
+	-- Calculate a new checksum, to check for modified data
+	SELECT *,
+			BINARY_CHECKSUM(ScriptData) AS [CheckSumValue_New]
+		INTO #APSLogin
+		FROM APSLogin
+
+	-- Check for modified data
+	IF (SELECT COUNT(*)
+			FROM #APSLogin
+			WHERE CheckSumValue != CheckSumValue_New) > 0
+		BEGIN
+			SELECT CAST(1 AS INT) AS RowNum,
+                               CAST('E' AS CHAR(1)) AS RowType,
+                               CAST('Modified data detected' AS VARCHAR(1024) ) AS Results
+			  UNION
+			SELECT RowID + 1 AS RowNum,
+                               CAST('D' AS CHAR(1)) AS RowType,
+			       ScriptData
+			    FROM #APSLogin
+			    WHERE CheckSumValue != CheckSumValue_New
+
+			RETURN
+		END
+
+	DECLARE script_curs CURSOR STATIC FOR 
+		SELECT ScriptData
+			FROM APSLogin
+			ORDER BY RowID
+
+	OPEN script_curs 
+
+    FETCH NEXT 
+        FROM script_curs 
+        INTO @SQLCmd
+
+	WHILE @@fetch_status = 0 
+        BEGIN 
+
+			IF @SQLCmd Like '%CREATE LOGINS%' SELECT @Activity = 1
+			IF @SQLCmd LIKE '%SET SERVER ROLES%' SELECT @Activity =  2
+			IF @SQLCmd LIKE '%SET DB PERMISSIONS%' SELECT @Activity =  3
+
+			IF @SQLCmd NOT LIKE '/*%'
+				BEGIN
+ 					
+					IF @Activity = 1
+						BEGIN
+							SELECT @Start = CHARINDEX('[', @SQLCmd, (CHARINDEX(';', @SQLCmd)))
+							SELECT @End = CHARINDEX(']', @SQLCmd, @Start)
+							SELECT @Login = SUBSTRING (@SQLCmd, @Start + 1, (@End - @Start - 1) )
+
+							IF EXISTS (SELECT *
+										   FROM sys.server_principals	s
+										   WHERE s.[name] = @Login)
+								BEGIN
+									SELECT @SQLCmd_2 = 'DROP LOGIN [' + @Login + ']'
+
+									EXEC (@SQLCmd_2)	
+								END
+	
+							EXEC (@SQLCmd)	
+							
+							INSERT #Logins VALUES (@Login)
+
+							SELECT @LoginCount += 1			
+						END
+
+					IF @Activity = 2
+						BEGIN
+							EXEC (@SQLCmd)			
+						END
+
+					IF @Activity = 3
+						BEGIN
+							SELECT @Login = SUBSTRING(@SQLCmd, (CHARINDEX('[', @SQLCmd, CHARINDEX(']', @SQLCmd)) + 1), 64)
+							SELECT @Login = SUBSTRING(@Login, 1, (CHARINDEX(']', @Login) - 1) )
+							SELECT @SQLCmd_2 = REPLACE (@SQLCmd, 'CREATE', 'IF EXISTS (SELECT * FROM sys.Database_Principals d WHERE d.[name] = ''' + @Login  + ''') DROP')
+							SELECT @SQLCmd_2 = SUBSTRING(@SQLCmd_2, 0, CHARINDEX('FOR', @SQLCmd_2))
+
+							EXEC (@SQLCmd_2)		
+							EXEC (@SQLCmd)			
+						END
+
+				END
+
+			FETCH NEXT 
+				FROM script_curs 
+				INTO @SQLCmd
+
+		END
+
+    CLOSE script_curs 
+    DEALLOCATE script_curs 
+
+	IF @LoginCount > 0
+		BEGIN
+			SELECT @Msg = 'OK: ' + CAST (@LoginCount AS VARCHAR(4) ) + ' logins created'
+		    SELECT @Msg AS Results
+			  UNION
+			SELECT '  ' [Login] 
+				FROM #Logins
+				ORDER BY 1
+		
+		END
+	ELSE
+		BEGIN
+			SELECT @Msg = '>> No logins created'
+			IF (SELECT COUNT(*)
+					FROM #APSLogin
+					WHERE CheckSumValue != CheckSumValue_New) > 0
+				BEGIN
+				    SELECT @Msg AS Results
+				END
+			ELSE
+				BEGIN
+				    SELECT @Msg2 = '>> No data in file'
+					SELECT @Msg AS Results
+					  UNION
+					SELECT @Msg2
+				END
+
+		END
+
+    DROP TABLE #APSLogin
+
+END

@@ -30,7 +30,16 @@
 #* Modified: 04/12/2017 sfacer
 #* Changes
 #* 1. Removed DESC from order by on SELECT db names
-#+ 2. Added '[]' around schema and table names
+#* 2. Added '[]' around schema and table names
+#* Modified: 02/20/2018 sfacer
+#* Changes:
+#* 1. Exclude databases being restored.
+#* Modified: 10/04/2018 sfacer
+#* Changes
+#* 1. Changed login failure error handling
+#* Modified: 06/01/2020 sfacer
+#* Changes
+#* 1. Closed Progress display cleanly
 #*=============================================
 
 param([string]$username,[string]$password,[string]$database)
@@ -77,11 +86,26 @@ catch
 		write-eventlog -entrytype Error -Message "Failed to assign variables `n`n $_.exception" -Source $source -LogName ADU -EventId 9999	
 		Write-error "Failed to assign variables... Exiting" #Writing an error and exit
 	}
-if (!(CheckPdwCredentials -U $PDWUID -P $PDWPWD))
-{
+if ($PDWUID -eq $null -or $PDWUID -eq "")
+  {
+    Write-Host  "UserName not entered - script is exiting" -ForegroundColor Red
+    pause
+    return
+  }
+	
+if ($PDWPWD -eq $null -or $PDWPWD -eq "")
+  {
+     Write-Host  "Password not entered - script is exiting" -ForegroundColor Red
+    pause
+    return
+  }
 
-    write-error "failed to validate credentials"
-}
+if (!(CheckPdwCredentials -U $PDWUID -P $PDWPWD))
+  {
+    Write-Host  "UserName / Password authentication failed - script is exiting" -ForegroundColor Red
+    pause
+    return
+  }
 
 
 Write-Host -ForegroundColor Cyan "`nLoading SQL PowerShell Module..."
@@ -102,7 +126,7 @@ function ReplicatedTableSize()
                 #must set $outerLCV to 0 outside outer loop
                 $innerLCV = 0
                 [int64]$percentComplete = ($outerLCV/$($databases.count))*100
-                Write-Progress -Activity "Looping through databases" -Status "$percentComplete Percent Complete" -PercentComplete $percentComplete
+                Write-Progress -Id 1 -Activity "Looping through databases (Replicated Table Sizes)" -Status "$percentComplete Percent Complete" -PercentComplete $percentComplete
                 $outerLCV++
                 ##########################
 				Write-Host -ForegroundColor Cyan "Gathering data for DB: $db"
@@ -149,7 +173,7 @@ function ReplicatedTableSize()
 
 					
 
-						# Varaibles
+						# Variables
 						$totalDataSpace=0
 						[int64]$totalRows=0
 						$row = $tableRepSize.NewRow()
@@ -189,6 +213,8 @@ function ReplicatedTableSize()
 						$row.totalRows = $totalRows
 						$tableRepSize.Rows.Add($row)
 					}
+                Write-Progress -id 1 -Activity "Looping through tables in $db" -Completed
+
 				#trying adding total rows
 				$tableRepSize |sort-object totalSpace -descending | ft databaseName, tableName, @{label = "Total Table Size MBs" ; Expression = {$_.totalSpace}},@{label = "Total Rows" ; Expression = {$_.totalRows}} -auto
 				$tableRepSize |sort-object totalSpace -descending | ft databaseName, tableName, @{label = "Total Table Size MBs" ; Expression = {$_.totalSpace}},@{label = "Total Rows" ; Expression = {$_.totalRows}} -auto |out-file -append $OutputFile	
@@ -198,6 +224,7 @@ function ReplicatedTableSize()
 				#$tableRepSize |sort-object totalSpace -descending | ft databaseName, tableName, @{label = "Total Table Size MBs" ; Expression = {$_.totalSpace}} -auto |out-file -append $OutputFile	
 				#$replicatedtables += $tableRepSize
 			}
+        Write-Progress -Id 1 -Activity "Looping through databases" -Completed
 		}
     catch
 		{
@@ -239,6 +266,8 @@ function ReplicatedTableSize()
 		ConvertTo-Html -head $head -PostContent $body -body "<H1>Replicated Table Size Report</H1><H2>Appliance: $Appliance<br>Date: $date</H2>" | out-file $OutputFileHTML -Append
 		$replicatedtables | Export-Csv -Append $OutputFileCSV -NoTypeInformation
 		#start $OutputFileHTML
+
+    Write-Progress -Activity "Looping through databases" -Completed
 	
 }
 # Functions End
@@ -247,7 +276,8 @@ function ReplicatedTableSize()
 # Get list of database names
 try
 	{		
-		$dbs = Invoke-Sqlcmd -querytimeout 0 -Query "select name from sys.databases where name not in ('master','tempdb','stagedb') order by name;" -ServerInstance "$PDWHOST,17001" -Username $PDWUID -Password $PDWPWD
+                $dbs = Invoke-Sqlcmd -querytimeout 0 -Query "select name from sys.databases where name not in ('master','tempdb','stagedb', 'mavtdb') AND name NOT IN (select database_name from sys.pdw_loader_backup_runs where operation_type = 'RESTORE' AND end_time IS NULL ) order by name;" -ServerInstance "$PDWHOST,17001" -Username $PDWUID -Password $PDWPWD
+
 	}
 catch
 	{

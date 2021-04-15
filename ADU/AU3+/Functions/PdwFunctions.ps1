@@ -88,7 +88,8 @@ function GetNodeList (	[switch]$useXml=$false,
 		if($ctl){$nodeList += (Get-clusterGroup | ? {$_.name -like "*-CTL*"}).name}
 		if($full -or $fullPDW){$nodeList += (Get-ClusterNode).name;
 				$nodeList += (Get-clusterGroup | ? {$_.name -like "*-*" -and $_.name.length -le 15}).name;
-				$nodeList += "$fabReg-AD01","$fabReg-AD02"} 
+				$nodeList += "$fabReg-AD01"
+				if ($nodeList -contains "$fabReg-HST02") {$nodeList += "$fabReg-AD02"} }
 
 		#HDI section
 		#HDI does not yet have FQDN or -useXML functionality
@@ -502,7 +503,7 @@ function ExecuteSqlQuery
 #*=============================================
 #* Purpose: Collects files in the path provided
 #*	and copies them to the output path provided
-#*  Provide teh path without the drive letter example: perflogs\test\*.txt
+#*  Provide the path without the drive letter example: perflogs\test\*.txt
 #*=============================================
 function CollectFiles
 {
@@ -556,6 +557,61 @@ function CollectFiles
 		}
 	}
 }
+
+#*=============================================
+#* Function: CollectFiles_FolderName
+#* Created: [09/14/2018]
+#* Edited: []
+#* Author: Simon Facer
+#* Based on CollectFiles
+#*   Adds functionality to include the last SubFolder name
+#*   Based on a need to collect WER (Windows Error Report) files, where the files are all named the same,
+#*   but with a different folder name
+#* Arguments: 
+#*	$nodeList
+#*	$filePath
+#*	$outputdir - directly where output will be placed
+#*	$days - only get files newer than this many days. If it doesn't fall in the range it will grab most recent
+#*=============================================
+#* Purpose: Collects files in the path provided
+#*	and copies them to the output path provided
+#*  Provide the path without the drive letter example: perflogs\test\*.txt
+#*=============================================
+function CollectFiles_FolderName
+{
+
+	param($nodeList=$null,$filepath=$null,$outputDir=$null,$days=$null,$actionName=$null)
+	if((!$nodelist) -or (!$filepath) -or (!$outputDir) -or (!$days))
+	{
+		Write-Host -ForegroundColor Red "Variable not set for CollectFiles function"
+		return $false
+	}
+	$now = get-date
+    $driveLetter = "C$"
+$nodelist	
+	foreach ($server in $nodelist)
+	{
+        $Files = $null
+        $PathIdx = ($FilePath).split("\").count - 1
+        $FileNameSearch = ($FilePath).split("\")[$PathIdx]
+        $FileNameSearchPath = "\\$server\$driveLetter\" + $filepath.Substring(0,($filepath.Length - $FileNameSearch.Length) - 1)
+        $FileList = Get-ChildItem -path $FileNameSearchPath -Include $FileNameSearch -Recurse -ErrorAction SilentlyContinue
+
+		if($FileList.Count -gt 0) {
+            mkdir -force "$outputDir\$actionName" | Out-Null
+
+            foreach($file in $fileList) {
+                $FilePath = $file.DirectoryName
+                $PathIdx = ($FilePath).split("\").count - 1
+                $FolderLastPath = ($FilePath).split("\")[$PathIdx]
+                mkdir -force "$outputDir\$actionName\$server\$FolderLastPath" | Out-Null
+                "$outputDir\$actionName\$server\$FolderLastPath\$($file.name))"
+                $FileDateTime = (($file.CreationTime).Year).ToString() + (($file.CreationTime).Month).ToString("00") + (($file.CreationTime).Day).ToString("00") + "_" + (($file.CreationTime).Hour).ToString("00") + (($file.CreationTime).Minute).ToString("00") + (($file.CreationTime).Second).ToString("00") + "."
+                copy-item -recurse $file.fullname "$outputDir\$actionName\$server\$FolderLastPath\$FileDateTime$($file.name)" -Force | out-null
+              }
+          }
+      }
+  }
 
 #*=============================================
 #* Function: GetPdwVersion
@@ -681,7 +737,13 @@ Function GetHardwareVendor
 Function LoadSqlPowerShell
 {
 	Push-Location
-	Import-Module SQLPS -DisableNameChecking
+    if ((Get-Module -Name SQLServer).count -gt 0) {
+        Write-EventLog -entrytype Information -Message "Skipping Import-Module SQLPS, Module SQLServer is already imported" -Source $source -LogName ADU -EventId 9999
+      }
+    else {
+    	Import-Module SQLPS -DisableNameChecking
+      }
+       
 	Pop-Location
 }
 

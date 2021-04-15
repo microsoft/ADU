@@ -15,6 +15,9 @@
 
 #*=============================================
 #* REVISION HISTORY
+#* Modified: 10/04/2018 sfacer
+#* Changes
+#* 1. Changed login failure error handling
 #*=============================================
 
 #*=============================================
@@ -56,11 +59,26 @@ catch
 		Write-error "Failed to assign variables... Exiting" #Writing an error and exit
 	}
 
-if (!(CheckPdwCredentials -U $username -P $password))
-{
+if ($PDWUID -eq $null -or $PDWUID -eq "")
+  {
+    Write-Host  "UserName not entered - script is exiting" -ForegroundColor Red
+    pause
+    return
+  }
+	
+if ($PDWPWD -eq $null -or $PDWPWD -eq "")
+  {
+    Write-Host  "Password not entered - script is exiting" -ForegroundColor Red
+    pause
+    return
+  }
 
-    write-error "failed to validate credentials"
-}
+if (!(CheckPdwCredentials -U $PDWUID -P $PDWPWD))
+  {
+    Write-Host  "UserName / Password authentication failed - script is exiting" -ForegroundColor Red
+    pause
+    return
+  }
 
 
 Write-Host -ForegroundColor Cyan "`nLoading SQL PowerShell Module..."

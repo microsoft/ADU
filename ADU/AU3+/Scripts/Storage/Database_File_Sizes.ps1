@@ -1,7 +1,7 @@
-#* FileName: Orphaned_Table_Listing.ps1
+#* FileName: DatabaseFiles.ps1
 #*=====================================================================
-#* Script Name: OrphanedTableListing.ps1
-#* Created: [04/04/2017]
+#* Script Name: DatabaseFiles.ps1
+#* Created: [11/06/2018]
 #* Author: Simon Facer
 #* Company: Microsoft
 #* Email: sfacer@microsoft.com
@@ -10,8 +10,8 @@
 #* 
 #* Keywords:
 #*=====================================================================
-#* Purpose: List orphaned tables in a database
-#*          Table on CMPxx nodes have no matching table on CTL01
+#* Purpose: List file aloocated and used space for all files 
+#*          in database(s)
 #*=====================================================================
 
 #*=====================================================================
@@ -19,9 +19,6 @@
 #*=====================================================================
 #* Modified: 
 #* Changes:
-#* Modified: 10/04/2018 sfacer
-#* Changes
-#* 1. Changed login failure error handling
 #*=====================================================================
 
 param([string]$username,[string]$password,[string]$database)
@@ -44,12 +41,12 @@ try
 		$PDWHOST = GetNodeList -ctl	
 		$counter = 1
 		$CurrTime = get-date -Format yyyyMMddHHmmss
-		$OutputFileTXT = "D:\PDWDiagnostics\TableHealth\OrphanedTableListing_$CurrTime.txt"
-		$OutputFileCSV = "D:\PDWDiagnostics\TableHealth\OrphanedTableListing_$CurrTime.csv"
-		$OutputFileHTML = "D:\PDWDiagnostics\TableHealth\OrphanedTableListing_$CurrTime.html"
-		if (!(test-path "D:\PDWDiagnostics\TableHealth"))
+		$OutputFileTXT = "D:\PDWDiagnostics\Misc\FileSizeListing_$CurrTime.txt"
+		$OutputFileCSV = "D:\PDWDiagnostics\Misc\FileSizeListing_$CurrTime.csv"
+		$OutputFileHTML = "D:\PDWDiagnostics\Misc\FileSizeListing_$CurrTime.html"
+		if (!(test-path "D:\PDWDiagnostics\Misc"))
 			{
-				New-item "D:\PDWDiagnostics\TableHealth" -ItemType Dir | Out-Null
+				New-item "D:\PDWDiagnostics\Misc" -ItemType Dir | Out-Null
 			}
 		if (!(test-path $OutputFileTXT))
 			{
@@ -110,27 +107,16 @@ function Get-CTL01MappedDatabaseName ($dbname)
         return $MappedDBName
 	}
 
-function Get-CTL01MappedTableList($dbname)
-	{	
-	  
-      $rset_MappedTableNames = @{}
-      $SQLQuery = "SELECT DISTINCT tm.physical_name AS Mapped_Table
-		             FROM [" + $dbname + "].[sys].[objects] o INNER JOIN [" + $dbname + "].[sys].[pdw_table_mappings] tm ON o.object_id = tm.object_id
-				     ORDER BY 1;"
-
-		$rset_MappedTableNames = Invoke-Sqlcmd -Query $SQLQuery -ServerInstance "$PDWHOST,17001" -Username $PDWUID -Password $PDWPWD 
-
-        return $rset_MappedTableNames
-	}
-
-function Get-CMPxxTableNames($CMPNode, $dbname)
+function Get-CMPxxFiles($CMPNode, $dbname)
 	{
 
-		$SQLQuery = "SELECT '$CMPNode' AS CMPNode, '$dbname' AS DBName, o.name AS TableName FROM [$dbname].[sys].[objects] o WHERE type = 'U' ORDER BY 3;"
-		$rset_CMPTableNames = $NULL
-        $rset_CMPTableNames = Invoke-Sqlcmd -Query "$SQLQuery" -ServerInstance "$CMPNode" -Database $dbname
+		$SQLQuery = "SELECT type, Name, physical_name, size / 128.0 AS Size_MB, CAST(FILEPROPERTY(name, 'SpaceUsed') AS INT)/128.0 as Space_Used_MB 
+                     FROM sys.database_files
+                     ORDER BY type, file_id;"
+		$rset_CMPNodeFiles = $NULL
+        $rset_CMPNodeFiles = Invoke-Sqlcmd -Query "$SQLQuery" -ServerInstance "$CMPNode" -Database $dbname
 
-        Return $rset_CMPTableNames
+        Return $rset_CMPNodeFiles
 
 	}
 
@@ -156,24 +142,26 @@ catch
 ## Get list of database names
 $dbs = Invoke-Sqlcmd -Query "select name from sys.databases where name not in ('master','tempdb','stagedb', 'mavtdb') order by name;" -ServerInstance "$PDWHOST,17001" -Username $PDWUID -Password $PDWPWD
 
-
-$tblDBSummary = $NULL
-$tblDBSummary = New-Object system.Data.DataTable "DatabaseSummary"
-$colDatabaseName = New-Object system.Data.DataColumn DatabaseName,([string])
-$colTableCount = New-Object system.Data.DataColumn TableCount,([int])
-$tblDBSummary.columns.add($colDatabaseName)
-$tblDBSummary.columns.add($colTableCount)
-
-$tblOrphanedTables = $NULL
-$tblOrphanedTables = New-Object system.Data.DataTable "CmpNodeTableList"
+$tblDBFiles = $NULL
+$tblDBFiles = New-Object system.Data.DataTable "DBFileList"
 $colUserDatabaseName = New-Object system.Data.DataColumn DatabaseName,([string])
 $colMappedDatabaseName = New-Object system.Data.DataColumn MappedDatabaseName,([string])
 $colCmpNode = New-Object system.Data.DataColumn NodeName,([string])
-$colMappedTableName = New-Object system.Data.DataColumn MappedTableName,([string])
-$tblOrphanedTables.columns.add($colUserDatabaseName)
-$tblOrphanedTables.columns.add($colMappedDatabaseName)
-$tblOrphanedTables.columns.add($colCmpNode)
-$tblOrphanedTables.columns.add($colMappedTableName)
+$colFileType  = New-Object system.Data.DataColumn FileType,([string])
+$colLogicalName  = New-Object system.Data.DataColumn LogicalName,([string])
+$colPhysicalName  = New-Object system.Data.DataColumn PhysicalName,([string])
+$colSizeMB  = New-Object system.Data.DataColumn SizeMB,([decimal])
+$colSpaceUsedMB  = New-Object system.Data.DataColumn SpaceUsedMB,([decimal])
+$colSpaceUsedPct  = New-Object system.Data.DataColumn SpaceUsedPct,([decimal])
+$tblDBFiles.columns.add($colUserDatabaseName)
+$tblDBFiles.columns.add($colMappedDatabaseName)
+$tblDBFiles.columns.add($colCmpNode)
+$tblDBFiles.columns.add($colFileType)
+$tblDBFiles.columns.add($colLogicalName)
+$tblDBFiles.columns.add($colPhysicalName)
+$tblDBFiles.columns.add($colSizeMB)
+$tblDBFiles.columns.add($colSpaceUsedMB)
+$tblDBFiles.columns.add($colSpaceUsedPct)
 
 
 #Empty body to hold the html fragments
@@ -185,10 +173,7 @@ $HTMLbody += "<h2>______________________________________________________</h2>"
 
 ## For each db, 
 ##   Get the mapped DB name
-##   Get the list of mapped tables
-##   On each CMP node SQL Instance, get the list of tables
-##   Match the CMP node table list with the list if mapped tables from CTL01,
-##      Report tables on the CMP node that arent in the mapped table list
+##   On each CMP node SQL Instance, get the list of files for the database
 do
 {
 	#create the initial menu array
@@ -203,7 +188,7 @@ do
     # Add the DB names to the array
 	for ($i=1;$i -le @($dbs).count; $i++) {$TableMenuOptions+=($($dbs[$i-1].name))}
 
-	[string]$ans = OutputMenu -header "Orphaned Table Listing" -options $TableMenuOptions
+	[string]$ans = OutputMenu -header "Database File Sizes Listing" -options $TableMenuOptions
 	if($ans -eq "q"){break}
 		
 	if ($ans -eq "All DBs")
@@ -215,68 +200,62 @@ do
 	
    
 	foreach ($database in $db)
-		{
+		{          
           $UserDBName = $database  
           $MappedDBName = Get-CTL01MappedDatabaseName $database
           Write-Host "Processing: [$UserDBName] (mapped to [$MappedDBName])"  -ForegroundColor Green
 
-	      $MappedTableList = @{}
-	      $MappedTableList = Get-CTL01MappedTableList $database 
-          $MappedTableHash=@{}
-          foreach ($MappedTable in $MappedTableList)
-            {
-              $MappedTableHash.Add($MappedTable.Mapped_Table, $MappedTable.Mapped_Table)
-            }
-
-
           foreach ($node in $CMPList)
 	        {
-              Write-Host "  Processing: $Node"  -ForegroundColor DarkGreen
-              $CmpNodeTables = @{}
-	          $CmpNodeTables = Get-CMPxxTableNames $node $MappedDBName 
+              $CmpNodeFiles = @{}
+	          $CmpNodeFiles = Get-CMPxxFiles $node $MappedDBName 
               
-              foreach ($CMPTable in $CmpNodeTables)
+              foreach ($CMPNodeFile in $CmpNodeFiles)
                 {
-                  $CMPNodeTableName = $CMPTable.TableName
-   
-                  if ($MappedTableHash.ContainsKey($CMPNodeTableName) -eq $false)
-                    {
-                      $NewOrphanedTablesRow = $tblOrphanedTables.NewRow()
-                      $NewOrphanedTablesRow.NodeName = $CmpTable.CMPNode
-                      $NewOrphanedTablesRow.DatabaseName = $UserDBName
-                      $NewOrphanedTablesRow.MappedDatabaseName = $CmpTable.DBName
-                      $NewOrphanedTablesRow.MappedTableName = $CmpTable.TableName
-                      $tblOrphanedTables.Rows.Add($NewOrphanedTablesRow)
+                  $NewDBFilesRow = $tblDBFiles.NewRow()
+                  $NewDBFilesRow.DatabaseName = $UserDBName
+                  $NewDBFilesRow.MappedDatabaseName = $MappedDBName
+                  $NewDBFilesRow.NodeName = $node
+                  $PhysicalName = $CMPNodeFile.physical_name
+                  $LogicalName = $CMPNodeFile.name
+                  if ($CMPNodeFile.Type -eq 1) {
+                      $NewDBFilesRow.FileType = "Log"
                     }
+                  else {
+                      if ($PhysicalName -match "primary") {
+                          $NewDBFilesRow.FileType = "Primary"
+                        }
+                      elseif ($LogicalName -match "DIST") {
+                          $Distrib = ($LogicalName.split("_"))[1]
+                          $NewDBFilesRow.FileType = "Distributed ($Distrib)"
+                        }
+                      else {
+                          $NewDBFilesRow.FileType = "Replicated"
+                        }
+                    }
+                  $NewDBFilesRow.LogicalName = $LogicalName
+                  $NewDBFilesRow.PhysicalName = $PhysicalName
+                  $NewDBFilesRow.SizeMB = $CMPNodeFile.Size_MB
+                  $NewDBFilesRow.SpaceUsedMB =  $CMPNodeFile.Space_Used_MB 
+                  [int]$SpaceUsedPct = 10000 * ($CMPNodeFile.Space_Used_MB / $CMPNodeFile.Size_MB)
+                  $NewDBFilesRow.SpaceUsedPct = $SpaceUsedPct / 100.00
+                  $tblDBFiles.Rows.Add($NewDBFilesRow)
                 }
 
             }
 
-          $TableCount = $tblOrphanedTables.items.count
-          Write-Host " $TableCount Orphaned Tables Identified" -ForegroundColor Cyan              
-          
-
-          $NewDBSummaryRow = $tblDBSummary.NewRow()
-          $NewDBSummaryRow.DatabaseName = $UserDBName
-          $NewDBSummaryRow.TableCount = $TableCount
-          $tblDBSummary.Rows.Add($NewDBSummaryRow)  
-
-
-          $tblOrphanedTables | SELECT DatabaseName, MappedDatabaseName, NodeName, MappedTableName | ft -autosize  | out-file -append $OutputFileTXT
 
 
 	      #build the body of the HTML
-	      if ($tblOrphanedTables.items.count -gt 0)
-	        {
-	          $HTMLbody += "<h2>Database: [$UserDBName], mapped to [$MappedDBName]</h2><br>"
-              $HTMLbody += $tblOrphanedTables | select @{label = "Compute Node" ; Expression = {$_.NodeName}}, @{label = "Orphaned Table Name" ; Expression = {$_.MappedTableName}} | ConvertTo-Html -Fragment 
-	          $HTMLbody += "<h2>______________________________________________________</h2>"
-	          $HTMLbody += "<br>"
-	        }
 
-	      $tblOrphanedTables | Export-Csv $OutputFileCSV -NoTypeInformation -Append
+  	      $HTMLbody += "<h2>Database: [$UserDBName], mapped to [$MappedDBName]</h2><br>"
+          $HTMLbody += $tblDBFiles | select @{label = "Compute Node" ; Expression = {$_.NodeName}}, @{label = "File Type" ; Expression = {$_.FileType}}, @{label = "File" ; Expression = {$_.PhysicalName}}, @{label = "Size (MB)" ; Expression = {$_.SizeMB}}, @{label = "Used (MB)" ; Expression = {$_.SpaceUsedMB}}, @{label = "Used (Pct)" ; Expression = {$_.SpaceUsedPct}} | ConvertTo-Html -Fragment 
+	      $HTMLbody += "<h2>______________________________________________________</h2>"
+	      $HTMLbody += "<br>"
+
+	      $tblDBFiles | Export-Csv $OutputFileCSV -NoTypeInformation -Append
   
-          $tblOrphanedTables.Clear()
+          $tblDBFiles.Clear()
 
         }
 
@@ -286,10 +265,8 @@ do
 $Rptdate=Get-Date
 $Appliance = (Get-Cluster).name.split("-")[0]
 
-$HTMLSummary += $tblDBSummary | Sort-Object DatabaseName | select @{label = "Database" ; Expression = {$_.DatabaseName}}, @{label = "Orphaned Table Count" ; Expression = {$_.TableCount}} | ConvertTo-Html -Fragment
 
 $HTMLOutput=@()
-$HTMLOutput += $HTMLSummary
 $HTMLOutput += $HTMLbody
 
 
@@ -302,11 +279,10 @@ $HTMLhead = @"
 	TD{border-width: 1px;padding: 5px;border-style: solid;border-color: black;background-color:Lavender}
 	</style>
 "@
-ConvertTo-Html -head $HTMLhead -PostContent $HTMLOutput -body "<H1>Orphaned Table Report</H1><H2>Appliance: $Appliance<br>Date: $Rptdate</H2>" | out-file $OutputFileHTML
+ConvertTo-Html -head $HTMLhead -PostContent $HTMLOutput -body "<H1>Database File Report</H1><H2>Appliance: $Appliance<br>Date: $Rptdate</H2>" | out-file $OutputFileHTML
 
-$tblDBSummary | Sort-Object DatabaseName | select @{label = "Database" ; Expression = {$_.DatabaseName}}, @{label = "Orphaned Table Count" ; Expression = {$_.TableCount}}  | ft -AutoSize
 
-Write-Host -ForegroundColor Cyan "`nOutput also located at: $OutputFileTXT (also .csv and .html)"
+Write-Host -ForegroundColor Cyan "`nOutput also located at: $OutputFileCSV (also .html)"
 
 
 

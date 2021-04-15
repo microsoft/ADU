@@ -1147,6 +1147,7 @@ Function RunPAV
         #PowerShell c:\adu\adu.ps1 -run_pav
         #start WINRM
         $PDWDomainName = GetPdwRegionName;Get-Service -Name winrm  -ComputerName "$PDWDomainName-CTL01" | Start-service
+
 }
 
 Function PAVTest
@@ -1768,12 +1769,14 @@ Function StatsAccuracyTest
                 if ($percentDiff -gt 10)
                 {
                     $result | add-member -NotePropertyName "Difference" -NotePropertyValue "$diff"
-					$result | add-member -NotePropertyName "Percent incorrect" -NotePropertyValue "$percentDiff%"
+		            $result | add-member -NotePropertyName "Percent incorrect" -NotePropertyValue "$percentDiff%"
                     $result | add-member -NotePropertyName "Database Name" -NotePropertyValue $dbname
                     $BadStats += $result                   
-				}
+		}
+
+
+            }
         }
-    }
 
         #work with results
 	    if ($BadStats) 
@@ -2549,7 +2552,7 @@ $head = @"
     #insert Microsoft services logo as base64 image
     $body += "<p align=`"left`"><img src=`"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAJgAAAAUCAIAAAD+0mPVAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAA4BpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+IDx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IkFkb2JlIFhNUCBDb3JlIDUuNi1jMDE0IDc5LjE1Njc5NywgMjAxNC8wOC8yMC0wOTo1MzowMiAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iIHhtbG5zOnN0UmVmPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VSZWYjIiB4bWxuczp4bXA9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC8iIHhtcE1NOk9yaWdpbmFsRG9jdW1lbnRJRD0ieG1wLmRpZDpCQjhBN0Y4QUZEMUYxMUUxOTY1MEFGMkYxNkY2NTQzQiIgeG1wTU06RG9jdW1lbnRJRD0ieG1wLmRpZDpBREQ4MDBFNjgxNUMxMUU0OTk1MDk4RTI4MDg3OEJGNyIgeG1wTU06SW5zdGFuY2VJRD0ieG1wLmlpZDpBREQ4MDBFNTgxNUMxMUU0OTk1MDk4RTI4MDg3OEJGNyIgeG1wOkNyZWF0b3JUb29sPSJBZG9iZSBQaG90b3Nob3AgQ0MgMjAxNCAoV2luZG93cykiPiA8eG1wTU06RGVyaXZlZEZyb20gc3RSZWY6aW5zdGFuY2VJRD0ieG1wLmlpZDpjMTcxNmViMi1mYTE1LTI2NGMtYTBlOC0wZjZhYTY2MzAxYzQiIHN0UmVmOmRvY3VtZW50SUQ9ImFkb2JlOmRvY2lkOnBob3Rvc2hvcDo3MTUxMGVjMy04MTVjLTExZTQtYTZmMy1lYzYzNzNlMTFmZmUiLz4gPC9yZGY6RGVzY3JpcHRpb24+IDwvcmRmOlJERj4gPC94OnhtcG1ldGE+IDw/eHBhY2tldCBlbmQ9InIiPz4+GqmcAAAFT0lEQVR42uyYPyxlTxTH7YuKmpqamppeoiNaQUVQEVRPUBG0aNGipkXradGiRfv2k/dNzu/8ZubOtbvexibvFDdz5545///N/VGv119eXm5ubkZGRtqKAZzLy8vx8XG9np+fDw4Odnd3t30nODw8RBGkQra8Oh7Qq1aroWBvby9nh4eHOzs7myEeskG5v7+/GcQrctLR0RHKZPDw3Onpqdbv7+/go/+38iJmQqSdnZ319XV5ETlRrdT3+/v7j4+P2Bdk1GTdvDg7OTlpEvF2W8EDEySRsIh3G2G1vb393dIRB5BSPpnwCk+rIskyc3FxUa1Wm5QlARSZ98syEujq6rq/vy8KRizy8fHhdwKT/aOAXn19fX/Hi0B3A5qbka+vr6iEYnNzc0mFh4aGrq6ufF9Bfy/WTQPUafhEl1KW03IsOSYnJ4O2RDSAKRyfKJACAVJ85Rn3M1jDRQfVv7Wv2sWnWgMkA08wYyO+N6C0gyIMaIhBxTYiIs6mRIU+TKVvwEiCsa8jPm7IHOjzlDooa+lRxNfbp78Bsk/FPlOCcFXcVFRUA1uzaZgw29zc3NvbUydnn7U+0VZhOTMzg6wyGc+FhQW6hVyIECjPjhkU+XiVFzkLpnGxgzJWcPA3AAGenp6K6pA40kHlMFTm1ZAVKKurqxJJ1kBghWzQGnXKYsv2FxcX4SLXoo7Q8nxhoVd9Mvu0MbXe3d2Njo6yWFlZ2d3drf8fpqamjo+PDUcAJjtaHxwczM/Pv7291SPgyMTExPX1te1AP0BmzY7x3djYiGXQfv4gQiKVP3LcgHoWOI6QSTTp9fz8bOyQwVhwBMtw3It0dnbGpifCceiLiJcHm2CZh4eHX+XLIiltxccOka509pnHa2aU17xAzSxqmYMNMGSSPkBmrWIgvoq1mMvt7W3RwT9pLbSSsbEx0mh6etqnC8KgF/StpsEOAZgkzD70o0AkDMgmNgzacFzVySSsGmsqvpD1fBHD+KoOFw47JgfHfHHAkfDLzDUoz6CUmReCltDR0REjy9OqHshAkfG20KckFx3MX5xKATNxacGma2trVqkkDIrXHKh+WpXDQ4FleGWY8MJjwKArKS7xd7zviXu+5kKpjH1ildtjrRQs0oFASI4/Xqb8JOa/JrMtFgDWdFkwWct5RWH4hfPk8vIyRqcz2aRGzMXXvth5AeAeAkKZKo8mHRlYxkOeL+7gKyzYMfskHKmEUCJqWP1CC0LqM7MJrDEl8YS4s7OzqhN/MtR8EmCEylhfjuTGlb/5JesQmxQPiEAtmY6lgLJ5vvgPssQ69llaWpK0lSJ91JYyt2m7UNpEWgogMyXGyHGEKkXoXnadSB5UtfnCUNPUbTRLfwxlAkIGTI4XKkvJaRkvUnVL+SIezibNrA9WkgmhG8XAwECpjRSV8cxd5Eii9b+J2XX+5EQAcTmv6CBuTh70Lfw3fofKUkmOn3EtjiTsisYceYtPMXHTNLZnki+MbL+SZIMvEeUz/501y3FfxKYiiu3sHhkDeYaxiBLFI0/WHLF/BUyPmpx1uzcZSg8mwxY0+1MRI0ABa2qa4MkrCytCdCNSCgSvV0Y1z5ccYPjM1FXElgqmjt0j+cRZ4yutjS+XSNkHZHBM2nYLkCApoeJ7QIDjf9Hpeg5R/VWnV9t9Ix4NOEhNQGjuwtpBZ4ZGi1w1acKINaXDHFl6kEUwSSEGXWpra6unpyc5sqmN0WmMICyMCOpXq1X0wqyml9HJ1yooY+vAkf5IUh3hw8Xz1bhufDW1mn3M1D+4S7a14N+HSssELUe2oOXIFrQc2YIk/BRgAJPqmiY68GapAAAAAElFTkSuQmCC`"></p>"
     #create the XML
-    $timestamp = get-date -Format MMddyy-hhmmss
+    $timestamp = get-date -Format yyyyMMdd-hhmmss
     $outputFile = "D:\PDWDiagnostics\WellnessCheck\$($fabdomain)_WellnessCheck_$($Timestamp).htm"
     
     #ConvertTo-Html -head $head -PostContent $body -body "<img src=`"$rootPath\images\Ms_logo.png`"><H1>Microsoft Analytics Platform System</H1><H2>Appliance: $fabdomain<br>Date: $timestamp</H2>" | out-file $outputFile
