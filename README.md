@@ -12,7 +12,7 @@ A menu will be displayed to select your options. All of these are safe to run wh
 
 ## Current Version / Changes
 07/28/2021, v4.8
-Change: DataBase_SpaceUtil_ByVolume modified to include TempoDB and PDWTempDB, and rollup space utilization to the volume (previously reported individual files, rather than summary by db by volume).
+Change: DataBase_SpaceUtil_ByVolume modified to include TempDB and PDWTempDB, and rollup space utilization to the volume (previously reported individual files, rather than summary by db by volume).
 
 
 ## Functionality
