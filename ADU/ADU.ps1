@@ -1,4 +1,4 @@
-﻿#* FileName: ADU.ps1
+#* FileName: ADU.ps1
 #*=============================================
 #* Script Name: ADU.ps1
 #* Created: [10/28/2013]
@@ -88,7 +88,7 @@ Param(
 ################################################################
 # Version Number - bump for any updates to any script in ADU!!!#
 ################################################################
-$aduVersion="v4.7"
+$aduVersion="v4.8"
 ################################################################
    
 #Set a global path variable for all scripts to use
@@ -126,7 +126,7 @@ try
 }
 catch
 {
-    #it usually fails becuase ADU has been ran with this source register, and cannot be re-registered under the new log name. Try to clean it up and try again
+    #it usually fails because ADU has been ran with this source register, and cannot be re-registered under the new log name. Try to clean it up and try again
     if ($_.exception -notlike "*source is already registered*")
     {
         remove-eventlog PSU
