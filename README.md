@@ -10,6 +10,11 @@ A menu will be displayed to select your options. All of these are safe to run wh
 
 
 
+## Current Version / Changes
+07/28/2021, v4.8
+Change: DataBase_SpaceUtil_ByVolume modified to include TempoDB and PDWTempDB, and rollup space utilization to the volume (previously reported individual files, rather than summary by db by volume).
+
+
 ## Functionality
 
 * **PRE-RELEASE: INSTALL_WINDOWS_UPDATES**: install windows updates that have been downloaded through WSUS, but does not reboot. This tool can be ran while the applaince is online. This feature has been tested on AU5 and is still in pre-release form. Contact Nicksalc for help using it pre-release form.
