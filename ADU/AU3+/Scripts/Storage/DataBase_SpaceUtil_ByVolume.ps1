@@ -1,4 +1,4 @@
-﻿#* FileName: DataBase_SpaceUtil_ByVolume.ps1
+#* FileName: DataBase_SpaceUtil_ByVolume.ps1
 #*=============================================
 #* Script Name: DataBase_SpaceUtil_ByVolume.ps1
 #* Created: [11/22/2017]
@@ -19,6 +19,13 @@
 #* Modified: 11/22/2017 sfacer
 #* Changes
 #* 1. Original version
+#* Modified: 06/16/2021 sfacer
+#* Changes
+#* 1. Reworked to summarize space allocations by volume / CMP node
+#* Modified: 07/28/2021 sfacer
+#* Changes
+#* 1. Included TempDB and PDWTempDB
+#* 2. Added code to load SQL Module
 #*=============================================
 
 . $rootPath\Functions\PdwFunctions.ps1
@@ -65,7 +72,8 @@ if (!(CheckPdwCredentials -U $PDWUID -P $PDWPWD))
 
 Try
 {
-	$CMPList=@()
+    $CtlNode = GetNodeList -ctl
+	$CMPList = @()
 	$CMPList = GetNodeList -cmp
 }
 catch
@@ -82,12 +90,10 @@ If (!(test-path "D:\PDWDiagnostics\StorageReport"))
 	New-item "D:\PDWDiagnostics\StorageReport" -ItemType Dir | Out-Null
   }
 
-$OutputFileLocal = "C:\Temp\$FileName"
-
 ## Get the volume list on each CMP node
 $Script  = "`$CMPNode = @{Name=`"NodeName`";expression={`$env:computername}};"
 $Script += "`$FileSizeGB = @{Name=`"FileSize`";expression={[math]::round(($`_.Length / 1073741824),4)}};"
-$Script += "Get-ChildItem G:\Data*\Data\*.*df -Recurse  | ?{$`_.Name -notlike `"*temp*`"} | SELECT `$CMPNode, Directory, Name, `$FileSizeGB "
+$Script += "Get-ChildItem G:\Data*\Data\*.*df -Recurse  | SELECT `$CMPNode, Directory, Name, `$FileSizeGB "
 
 $results = ExecuteDistributedPowerShell -nodeList $CMPList -command $Script
 
@@ -95,6 +101,11 @@ $results = ExecuteDistributedPowerShell -nodeList $CMPList -command $Script
 #########################################################################
 
 write-output "CONNECTING TO PDW..."
+
+## ===================================================================================================================================================================
+Write-Host -ForegroundColor Cyan "`nLoading SQL PowerShell Module..."
+LoadSqlPowerShell
+
 try 
 	{
 		$connection = New-Object System.Data.SqlClient.SqlConnection
@@ -109,15 +120,79 @@ catch
 	}
 
 
-$command = $connection.CreateCommand();
-$command.CommandText =  "SELECT d.name as DBName, dm.physical_name as Mapped_DB
+$SQLQuery =  "SELECT d.name as DBName, dm.physical_name as Mapped_DB
 FROM sys.databases d INNER JOIN sys.pdw_database_mappings dm ON d.database_id = dm.database_id
-WHERE  d.name NOT IN ('master', 'tempdb');" 
+WHERE  d.name NOT IN ('master');" 
 
-$DBName_results = $command.ExecuteReader();
+$rset_DBNames = Invoke-Sqlcmd -query $SQLQuery -ServerInstance "$CTLNode,17001" -UserName ${PDWUID} -Password ${PDWPWD}
 
+$tblFileData = $NULL
+$tblFileData = New-Object system.Data.DataTable "FileData"
+$ColFileSize = New-Object system.Data.DataColumn FileSize,([double])
+$ColKeyField = New-Object system.Data.DataColumn KeyField,([string])
+$tblFileData.columns.add($ColFileSize)
+$tblFileData.columns.add($ColKeyField)
 
+$tblSummedFileData = $NULL
+$tblSummedFileData = New-Object system.Data.DataTable "SummedFileData"
+$colDBName = New-Object system.Data.DataColumn UserDBName,([string])
+$colSysDBName = New-Object system.Data.DataColumn SysDBName,([string])
+$colCMPNode = New-Object system.Data.DataColumn CMPNode,([string])
+$colFolder = New-Object system.Data.DataColumn DataFolder,([string])
+$ColTotalFileSize = New-Object system.Data.DataColumn TotalFileSize,([double])
+$tblSummedFileData.columns.add($colDBName)
+$tblSummedFileData.columns.add($colSysDBName)
+$tblSummedFileData.columns.add($colCMPNode)
+$tblSummedFileData.columns.add($colFolder)
+$tblSummedFileData.columns.add($ColTotalFileSize)
 
-$results | SELECT NodeName, Directory, Name, FileSize | export-csv -NoTypeInformation $OutputFile
+foreach ($result in $results) 
+  {
+    $SysDBName = ($result.Name).Substring(0, ($Result.Name).indexOf("_", 5))
+    $UserDBName = ($rset_DBNames | ?{$_.Mapped_DB -eq $SysDBName} | SELECT DBName).DBName
+    $NodeName = $result.NodeName
+    $Directory = $result.Directory
+
+    $NewFileDataRow = $tblFileData.NewRow()
+    $NewFileDataRow.FileSize = $result.FileSize
+    $NewFileDataRow.KeyField = "$UserDBName|$SysDBName|$NodeName|$Directory"
+    $tblFileData.Rows.Add($NewFileDataRow)
+  }
+
+$GroupedFileData = $tblFileData | Group-Object -Property KeyField
+
+foreach ($FileDataGroup in $GroupedFileData) {
+    $KeyField = $FileDataGroup.Name
+    $FileDataSet = $FileDataGroup.Group
+    [double]$FileSizeSum = 0
+    foreach ($FileDataSetEntry in $FileDataSet) {
+        $FileSizeSum += $FileDataSetEntry.FileSize
+      }
+
+    $UserDBName = ($KeyField.Split("|"))[0]
+    $SysDBName = ($KeyField.Split("|"))[1]
+    if ($SysDBName -eq "tempdb" -or $SysDBName -eq "templog")
+      {
+        $UserDBName = "TempDB"
+      }    
+    if ($SysDBName -eq "pdwtempdb1" )
+      {
+        $UserDBName = "pdwtempdb1"
+      }
+    $NodeName = ($KeyField.Split("|"))[2]
+    $Directory = ($KeyField.Split("|"))[3]
+
+    $NewFileDataRow = $tblSummedFileData.NewRow()
+    $NewFileDataRow.UserDBName = $UserDBName
+    $NewFileDataRow.SysDBName = $SysDBName
+    $NewFileDataRow.CMPNode = $NodeName
+    $NewFileDataRow.DataFolder = $Directory
+    $NewFileDataRow.TotalFileSize = $FileSizeSum
+    $tblSummedFileData.Rows.Add($NewFileDataRow)
+  }
+
+$connection.Close()
+
+$tblSummedFileData | SORT UserDBName, CMPNode, DataFolder |  SELECT @{Name="DB Name"; Expression="UserDBName"},@{Name="System DB Name"; Expression="SysDBName"},@{Name="CMP Node"; Expression="CMPNode"},@{Name="Data Folder"; Expression="DataFolder"},@{Name="Allocated Space (GB)"; Expression="TotalFileSize"} | export-csv -NoTypeInformation $OutputFile
 
 Write-Host "`nOutput file saved to $OutputFile" -ForegroundColor Green
