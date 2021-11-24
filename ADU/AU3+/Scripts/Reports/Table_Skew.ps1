@@ -134,7 +134,7 @@ function GetTableSkew ()
 				try
 					{                           
 						#* Collect table details
-						$tbls = Invoke-Sqlcmd -QueryTimeout 0 -Query "use $db; SELECT '[' + sc.name + '].[' + ta.name + ']' as TableName FROM sys.tables ta join sys.schemas sc on ta.schema_id = sc.schema_id;" -ServerInstance "$PDWHOST,17001" -Username $PDWUID -Password $PDWPWD
+						$tbls = Invoke-Sqlcmd -QueryTimeout 0 -Query "use [$db]; SELECT '[' + sc.name + '].[' + ta.name + ']' as TableName FROM sys.tables ta join sys.schemas sc on ta.schema_id = sc.schema_id;" -ServerInstance "$PDWHOST,17001" -Username $PDWUID -Password $PDWPWD
 					}
 				catch
 					{
@@ -204,8 +204,8 @@ function GetTableSkew ()
 						
                         try
                           {
-                            ##$results = Invoke-Sqlcmd -querytimeout 0 -Query "use $db; DBCC PDW_SHOWSPACEUSED (`"$tbl`");" -ServerInstance "$PDWHOST,17001" -Username $PDWUID -Password $PDWPWD #-ErrorAction SilentlyContinue
-			    $Cmd = "use $db; IF EXISTS (SELECT x.* FROM (SELECT '[' + s.[name] + '].[' + o.[name] + ']' AS fqtn FROM SYS.Objects o INNER JOIN sys.schemas s ON o.[schema_id] = s.[schema_id]) AS x WHERE x.fqtn = '$tbl' ) DBCC PDW_SHOWSPACEUSED (`"$tbl`")"
+                            ##$results = Invoke-Sqlcmd -querytimeout 0 -Query "use [$db]; DBCC PDW_SHOWSPACEUSED (`"$tbl`");" -ServerInstance "$PDWHOST,17001" -Username $PDWUID -Password $PDWPWD #-ErrorAction SilentlyContinue
+			    $Cmd = "use [$db]; IF EXISTS (SELECT x.* FROM (SELECT '[' + s.[name] + '].[' + o.[name] + ']' AS fqtn FROM SYS.Objects o INNER JOIN sys.schemas s ON o.[schema_id] = s.[schema_id]) AS x WHERE x.fqtn = '$tbl' ) DBCC PDW_SHOWSPACEUSED (`"$tbl`")"
 			    ##Write-Host $Cmd -ForegroundColor Cyan
                             $results = Invoke-Sqlcmd -Query $Cmd -ServerInstance "$PDWHOST,17001" -Username $PDWUID -Password $PDWPWD #-ErrorAction SilentlyContinue
                           }

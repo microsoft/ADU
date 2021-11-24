@@ -91,7 +91,7 @@ function GetTableSkew ()
 				try
 					{       
 						#* Collect table details
-						$tbls = Invoke-Sqlcmd -Query "use $db; SELECT ta.name TableName FROM sys.tables ta;" -ServerInstance "$PDWHOST,17001" -Username $PDWUID -Password $PDWPWD
+						$tbls = Invoke-Sqlcmd -Query "use [$db]; SELECT ta.name TableName FROM sys.tables ta;" -ServerInstance "$PDWHOST,17001" -Username $PDWUID -Password $PDWPWD
 					}
 				catch
 					{
@@ -149,7 +149,7 @@ function GetTableSkew ()
 						
 						try
 							{
-								$results = Invoke-Sqlcmd -Query "use $db; DBCC PDW_SHOWSPACEUSED ([$tbl]);" -ServerInstance "$PDWHOST,17001" -Username $PDWUID -Password $PDWPWD #-ErrorAction SilentlyContinue
+								$results = Invoke-Sqlcmd -Query "use [$db]; DBCC PDW_SHOWSPACEUSED ([$tbl]);" -ServerInstance "$PDWHOST,17001" -Username $PDWUID -Password $PDWPWD #-ErrorAction SilentlyContinue
 							}
 						catch
 							{

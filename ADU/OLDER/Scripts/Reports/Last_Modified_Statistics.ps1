@@ -91,7 +91,7 @@ function LastModifiedStatistics($databases)
 			try
 				{       
 					#* Collect table details
-					$results = Invoke-Sqlcmd -Query "use $db; select a.name as table_name, b.name AS stats_name, STATS_DATE(b.object_id,stats_id) AS stats_last_update from sys.tables a, sys.stats b where a.object_id = b.object_id" -ServerInstance "$PDWHOST" -Username $PDWUID -Password $PDWPWD -ErrorAction SilentlyContinue
+					$results = Invoke-Sqlcmd -Query "use [$db]; select a.name as table_name, b.name AS stats_name, STATS_DATE(b.object_id,stats_id) AS stats_last_update from sys.tables a, sys.stats b where a.object_id = b.object_id" -ServerInstance "$PDWHOST" -Username $PDWUID -Password $PDWPWD -ErrorAction SilentlyContinue
 				}
 			catch
 				{

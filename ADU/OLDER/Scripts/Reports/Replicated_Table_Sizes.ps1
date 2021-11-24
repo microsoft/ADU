@@ -103,7 +103,7 @@ function ReplicatedTableSize()
 				$tableRepSize.columns.add($coltotalSpace)	
 			
 
-				$tbls = Invoke-Sqlcmd -Query "use $db; SELECT ta.name TableName FROM sys.tables ta INNER JOIN sys.partitions pa ON pa.OBJECT_ID = ta.OBJECT_ID INNER JOIN sys.schemas sc ON ta.schema_id = sc.schema_id, sys.pdw_table_mappings b, sys.pdw_table_distribution_properties c WHERE ta.is_ms_shipped = 0 AND pa.index_id IN (1,0) and ta.object_id = b.object_id AND b.object_id = c.object_id AND c.distribution_policy = '3' GROUP BY sc.name,ta.name ORDER BY SUM(pa.rows) DESC;" -ServerInstance "$PDWHOST,17001" -Username $PDWUID -Password $PDWPWD
+				$tbls = Invoke-Sqlcmd -Query "use [$db]; SELECT ta.name TableName FROM sys.tables ta INNER JOIN sys.partitions pa ON pa.OBJECT_ID = ta.OBJECT_ID INNER JOIN sys.schemas sc ON ta.schema_id = sc.schema_id, sys.pdw_table_mappings b, sys.pdw_table_distribution_properties c WHERE ta.is_ms_shipped = 0 AND pa.index_id IN (1,0) and ta.object_id = b.object_id AND b.object_id = c.object_id AND c.distribution_policy = '3' GROUP BY sc.name,ta.name ORDER BY SUM(pa.rows) DESC;" -ServerInstance "$PDWHOST,17001" -Username $PDWUID -Password $PDWPWD
 						
 				foreach($tbl in $tbls.tablename) 
 					{
@@ -123,7 +123,7 @@ function ReplicatedTableSize()
 						# Capture DBCC PDW_SHOWSPACED output
 						try
 							{
-								$results = Invoke-Sqlcmd -Query "use $db; DBCC PDW_SHOWSPACEUSED ([$tbl]);" -ServerInstance "$PDWHOST,17001" -Username $PDWUID -Password $PDWPWD #-ErrorAction SilentlyContinue
+								$results = Invoke-Sqlcmd -Query "use [$db]; DBCC PDW_SHOWSPACEUSED ([$tbl]);" -ServerInstance "$PDWHOST,17001" -Username $PDWUID -Password $PDWPWD #-ErrorAction SilentlyContinue
 							}
 						catch
 							{
