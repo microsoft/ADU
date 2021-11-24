@@ -1453,7 +1453,7 @@ Function ReplicatedTableSizeTest
             Write-Progress -Activity "Querying replicated table sizes on all databases, currently on database $counter of $numDatabases : $dbname" -Status "$percentComplete% Complete" -PercentComplete $percentComplete
             $counter++
 
-				$tbls = Invoke-Sqlcmd -QueryTimeout 0 -Query "use $dbname; SELECT '''' + '[' + sc.name + '].[' + ta.name + ']' + '''' as TableName FROM sys.tables ta INNER JOIN sys.partitions pa ON pa.OBJECT_ID = ta.OBJECT_ID INNER JOIN sys.schemas sc ON ta.schema_id = sc.schema_id, sys.pdw_table_mappings b, sys.pdw_table_distribution_properties c WHERE ta.is_ms_shipped = 0 AND pa.index_id IN (1,0) and ta.object_id = b.object_id AND b.object_id = c.object_id AND c.distribution_policy = `'3`' GROUP BY sc.name,ta.name ORDER BY SUM(pa.rows) DESC;" -ServerInstance "$pdwDomainName-CTL01,17001" -Username $username -Password $password
+				$tbls = Invoke-Sqlcmd -QueryTimeout 0 -Query "use [$dbname]; SELECT '''' + '[' + sc.name + '].[' + ta.name + ']' + '''' as TableName FROM sys.tables ta INNER JOIN sys.partitions pa ON pa.OBJECT_ID = ta.OBJECT_ID INNER JOIN sys.schemas sc ON ta.schema_id = sc.schema_id, sys.pdw_table_mappings b, sys.pdw_table_distribution_properties c WHERE ta.is_ms_shipped = 0 AND pa.index_id IN (1,0) and ta.object_id = b.object_id AND b.object_id = c.object_id AND c.distribution_policy = `'3`' GROUP BY sc.name,ta.name ORDER BY SUM(pa.rows) DESC;" -ServerInstance "$pdwDomainName-CTL01,17001" -Username $username -Password $password
 						
 				foreach($tbl in $tbls) 
 					{
@@ -1463,7 +1463,7 @@ Function ReplicatedTableSizeTest
                         #write-host $tableName
 
 						# Capture DBCC PDW_SHOWSPACED output
-						$results = Invoke-Sqlcmd -QueryTimeout 0 -Query "use $dbname; DBCC PDW_SHOWSPACEUSED ($tableName);" -ServerInstance "$pdwDomainName-CTL01,17001" -Username $username -Password $password 
+						$results = Invoke-Sqlcmd -QueryTimeout 0 -Query "use [$dbname]; DBCC PDW_SHOWSPACEUSED ($tableName);" -ServerInstance "$pdwDomainName-CTL01,17001" -Username $username -Password $password 
 
 						#Grab one of the results - it's a replicated table so all nodes should be the same
                         $dataSpace = $results.data_space[0]
@@ -1585,7 +1585,7 @@ Function NullableDistColTest
 
 
             #Set the query to retrieve stats accuracy
-            $NullableDistColQuery = "use $dbname;
+            $NullableDistColQuery = "use [$dbname];
             --This query returns data if nullable distriubtion columns are found in the current database
 SELECT  
 	s.name AS 'Schema Name',
@@ -1703,7 +1703,7 @@ Function StatsAccuracyTest
 
 
             #Set the query to retrieve stats accuracy
-            $StatsAccuracyQuery = "use $dbname;
+            $StatsAccuracyQuery = "use [$dbname];
             SELECT pdwtbl.name , 
           Sum(part.rows)/ max(pdwpart.partition_number)/8 AS CMP_ROW_COUNT, 
            sum(pdwpart.rows)/max(size.distribution_id)/max(pdwpart.partition_number)/8 AS CTL_ROW_COUNT        
@@ -1863,7 +1863,7 @@ Function CCIHealthTest
 
 
             #Set the query to retrieve stats accuracy
-            $CCIHealthQuery = "use $dbname;
+            $CCIHealthQuery = "use [$dbname];
 --CCI Health by table
 SELECT               SYSDATETIME()                                                    as 'Collection_Date',
                      DB_Name()                                                        as 'Database_Name',
@@ -2036,7 +2036,7 @@ Function OrphanedTableTest
             Write-Progress -Activity "Querying for orphaned tables in all databases, currently on database $counter of $numDatabases : $dbname" -Status "$percentComplete% Complete" -PercentComplete $percentComplete
             $counter++
 
-            $orphanedQuery = "use $dbname;
+            $orphanedQuery = "use [$dbname];
 select ptm.object_id as PDW_OBJECT_ID, ptm.physical_name as PDW_PHYSICAL_NAME, pnt.name as Node_table_name,pnt.object_id as node_object_id,pnt.pdw_node_id,pnt.create_date  from sys.pdw_table_mappings ptm
 RIGHT JOIN sys.pdw_nodes_tables pnt
 ON ptm.physical_name = pnt.name
@@ -2142,7 +2142,7 @@ Function DataSkewTest
 
 		try
 		{
-            $tblsQuery = "use $dbname;
+            $tblsQuery = "use [$dbname];
 SELECT '[' + sc.name + '].[' + ta.name + ']' as TableName 
 FROM sys.tables ta 
 join sys.schemas sc 
@@ -2204,7 +2204,7 @@ where et.object_id IS NULL;"
 						
             try
             {
-                $results = Invoke-Sqlcmd -querytimeout 0 -Query "use $dbname; DBCC PDW_SHOWSPACEUSED (`"$tbl`");" -ServerInstance "$pdwDomainName-CTL01,17001" -Username $username -Password $password
+                $results = Invoke-Sqlcmd -querytimeout 0 -Query "use [$dbname]; DBCC PDW_SHOWSPACEUSED (`"$tbl`");" -ServerInstance "$pdwDomainName-CTL01,17001" -Username $username -Password $password
             }
             catch
             {
