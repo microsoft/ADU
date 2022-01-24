@@ -33,7 +33,6 @@ Change: DataBase_SpaceUtil_ByVolume modified to include TempDB and PDWTempDB, an
 * **Database Space Report**: Retrieves used and unused database space including the specified space when DB was created.
 * **Distributed Table Sizes**: Collects size of all distributed tables in selected database (or all)
 * **Failed Data Loads**:
-* **Generate CSV from XMLS (Beta)**:
 * **Last Modified Statistics**: Collects the last modified date for all statistics on all tables in the specified database (or all)
 * **Orphaned Table Listing**: Checks all databases for orphaned tables
 * **Replicated Table Sizes**: Collects size of all replicated tables. Generally to make sure none are too large.
