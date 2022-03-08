@@ -2,9 +2,9 @@
 
 ### Usage
 
-**You can download the newest releast from the 'release' page.** Extract the downloaded file (ADU-_version_.zip) to HST01 under C:\. The name of the ADU folder is not important unless you have set up automated jobs that depend on a particular folder structure. By default it will look like this: C:\ADU-4.5\ADU.ps1
+**You can download the newest releast from the 'release' page.** Extract the downloaded file (ADU-_version_.zip) to HST01 under C:\. The name of the ADU folder is not important unless you have set up automated jobs that depend on a particular folder structure. By default it will look like this: C:\ADU\ADU.ps1
 
-Execute it using PowerShell: C:\ADU-4.5\ADU.ps1
+Execute it using PowerShell: C:\ADU\ADU.ps1
 
 A menu will be displayed to select your options. All of these are safe to run while the appliance is online, but as a best practice you should not be making changes to the appliance under the highest volume times due to possible performance impact on the appliance or diagnostic tool. 
 
@@ -16,8 +16,6 @@ Change: DataBase_SpaceUtil_ByVolume modified to include TempDB and PDWTempDB, an
 
 
 ## Functionality
-
-* **PRE-RELEASE: INSTALL_WINDOWS_UPDATES**: install windows updates that have been downloaded through WSUS, but does not reboot. This tool can be ran while the applaince is online. This feature has been tested on AU5 and is still in pre-release form. Contact Nicksalc for help using it pre-release form.
 
 * **Diagnostics Collection**: Collect logs and diagnostic data from appliance
 * **Distributed command**: Run a command on all nodes or a subset of nodes.
