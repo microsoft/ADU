@@ -1,30 +1,27 @@
-﻿$path = (Get-Location).Path
+function Rename-Files {
+    param (
+        [Parameter(Mandatory=$true)]
+        [string]$Directory,
 
-$Files = Get-ChildItem -Path $path -Recurse -Include "*~ps.txt" -Force
+        [Parameter(Mandatory=$true)]
+        [string[]]$Extensions
+    )
 
-foreach ($file in $files) {
-    $NewName = $file.name -replace "~ps.txt", ".ps1"
-    Rename-Item -Path $file.FullName -NewName $NewName
-  }
+    $Files = Get-ChildItem -Path $Directory -Recurse -Include "*~*.txt" -Force
 
-$Files = Get-ChildItem -Path $path -Recurse -Include "*~bat.txt" -Force
+    foreach ($file in $Files) {
+        $extension = $file.Extension.TrimStart('.')
+        if ($Extensions -contains $extension) {
+            $NewName = $file.Name -replace "~$extension.txt", ".$extension"
+            Rename-Item -Path $file.FullName -NewName $NewName
+        }
+    }
 
-foreach ($file in $files) {
-    $NewName = $file.name -replace "~bat.txt", ".bat"
-    Rename-Item -Path $file.FullName -NewName $NewName
-  }
+    Write-Host "File renaming completed."
+}
 
-$Files = Get-ChildItem -Path $path -Recurse -Include "*~ps.txt" -Hidden
+# Usage example
+$Directory = (Get-Location).Path
+$Extensions = @("ps", "bat")
 
-foreach ($file in $files) {
-    $NewName = $file.name -replace "~ps.txt", ".ps1"
-    Rename-Item -Path $file.FullName -NewName $NewName
-  }
-
-$Files = Get-ChildItem -Path $path -Recurse -Include "*~bat.txt" -Hidden
-
-foreach ($file in $files) {
-    $NewName = $file.name -replace "~bat.txt", ".bat"
-    Rename-Item -Path $file.FullName -NewName $NewName
-  }
-
+Rename-Files -Directory $Directory -Extensions $Extensions
